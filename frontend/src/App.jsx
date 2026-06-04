@@ -19,6 +19,7 @@ import JoinClass from './pages/JoinClass'
 import ClassDetail from './pages/ClassDetail'
 import AssignmentDetail from './pages/AssignmentDetail'
 import CreateAssignment from './pages/CreateAssignment'
+import GradeSubmission from './pages/GradeSubmission'
 
 const queryClient = new QueryClient()
 
@@ -61,6 +62,7 @@ function App() {
               />
               <Route path="assignments/:id" element={<AssignmentDetail />} />
               <Route path="assignments/create" element={<CreateAssignment />} />
+              <Route path="submissions/:id" element={<GradeSubmission />} />
               <Route
                 path="grades"
                 element={
