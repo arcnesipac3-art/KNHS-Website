@@ -23,6 +23,7 @@ import GradeSubmission from './pages/GradeSubmission'
 import MarkAttendance from './pages/MarkAttendance'
 import AnnouncementList from './pages/AnnouncementList'
 import CreateAnnouncement from './pages/CreateAnnouncement'
+import GradeInput from './pages/GradeInput'
 
 const queryClient = new QueryClient()
 
@@ -69,6 +70,7 @@ function App() {
               <Route path="attendance/mark" element={<MarkAttendance />} />
               <Route path="announcements" element={<AnnouncementList />} />
               <Route path="announcements/create" element={<CreateAnnouncement />} />
+              <Route path="grades/input" element={<GradeInput />} />
               <Route
                 path="grades"
                 element={

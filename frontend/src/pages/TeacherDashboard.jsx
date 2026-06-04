@@ -68,7 +68,7 @@ export default function TeacherDashboard() {
           <Link to="/assignments/create">
             <Button>Create Assignment</Button>
           </Link>
-          <Link to="/grades">
+          <Link to="/grades/input">
             <Button variant="secondary">Input Grades</Button>
           </Link>
           <Link to="/attendance/mark">
