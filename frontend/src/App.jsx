@@ -24,6 +24,7 @@ import MarkAttendance from './pages/MarkAttendance'
 import AnnouncementList from './pages/AnnouncementList'
 import CreateAnnouncement from './pages/CreateAnnouncement'
 import GradeInput from './pages/GradeInput'
+import StudentGrades from './pages/StudentGrades'
 
 const queryClient = new QueryClient()
 
@@ -71,15 +72,7 @@ function App() {
               <Route path="announcements" element={<AnnouncementList />} />
               <Route path="announcements/create" element={<CreateAnnouncement />} />
               <Route path="grades/input" element={<GradeInput />} />
-              <Route
-                path="grades"
-                element={
-                  <PlaceholderPage
-                    title="Grades"
-                    description="DepEd WW/PT/QA grade input coming in Sprint 4."
-                  />
-                }
-              />
+              <Route path="grades" element={<StudentGrades />} />
               <Route
                 path="attendance"
                 element={
