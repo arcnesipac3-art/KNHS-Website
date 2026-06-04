@@ -17,6 +17,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import MyClasses from './pages/MyClasses'
 import JoinClass from './pages/JoinClass'
 import ClassDetail from './pages/ClassDetail'
+import AssignmentDetail from './pages/AssignmentDetail'
 
 const queryClient = new QueryClient()
 
@@ -57,6 +58,7 @@ function App() {
                   />
                 }
               />
+              <Route path="assignments/:id" element={<AssignmentDetail />} />
               <Route
                 path="grades"
                 element={
