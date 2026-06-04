@@ -12,14 +12,19 @@ from .serializers import ChangePasswordSerializer, LoginSerializer, UserSerializ
 
 
 def _set_refresh_cookie(response, refresh_token):
-    response.set_cookie(
-        key=settings.REFRESH_TOKEN_COOKIE_NAME,
-        value=str(refresh_token),
-        max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
-        httponly=settings.REFRESH_TOKEN_COOKIE_HTTPONLY,
-        secure=settings.REFRESH_TOKEN_COOKIE_SECURE,
-        samesite=settings.REFRESH_TOKEN_COOKIE_SAMESITE,
-    )
+    cookie_params = {
+        "key": settings.REFRESH_TOKEN_COOKIE_NAME,
+        "value": str(refresh_token),
+        "max_age": int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+        "httponly": settings.REFRESH_TOKEN_COOKIE_HTTPONLY,
+        "secure": settings.REFRESH_TOKEN_COOKIE_SECURE,
+        "samesite": settings.REFRESH_TOKEN_COOKIE_SAMESITE,
+    }
+    
+    # In production, don't set domain to allow cookie to work cross-origin
+    # The cookie will be set for the exact domain (Render backend)
+    
+    response.set_cookie(**cookie_params)
 
 
 def _clear_refresh_cookie(response):
