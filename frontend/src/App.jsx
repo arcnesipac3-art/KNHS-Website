@@ -27,6 +27,7 @@ import GradeInput from './pages/GradeInput'
 import StudentGrades from './pages/StudentGrades'
 import Materials from './pages/Materials'
 import UploadMaterial from './pages/UploadMaterial'
+import Notifications from './pages/Notifications'
 
 const queryClient = new QueryClient()
 
@@ -100,6 +101,10 @@ function App() {
               <Route
                 path="materials/upload"
                 element={<UploadMaterial />}
+              />
+              <Route
+                path="notifications"
+                element={<Notifications />}
               />
               <Route
                 path="people"

@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
 import DepEdHeader from './DepEdHeader'
+import NotificationPanel from '../notifications/NotificationPanel'
 import { ROLE_LABELS, school } from '../../styles/design-tokens'
 
 const NAV_BY_ROLE = {
@@ -108,12 +109,15 @@ export default function PortalLayout({ children }) {
               <p className="text-xs uppercase tracking-wider text-muted">Portal</p>
               <h2 className="text-lg font-semibold text-text">{school.name}</h2>
             </div>
-            <Link
-              to="/"
-              className="text-sm font-medium text-knhs-purple hover:text-knhs-purple-light"
-            >
-              Public site
-            </Link>
+            <div className="flex items-center gap-4">
+              <NotificationPanel />
+              <Link
+                to="/"
+                className="text-sm font-medium text-knhs-purple hover:text-knhs-purple-light"
+              >
+                Public site
+              </Link>
+            </div>
           </header>
           <main className="flex-1 p-4 md:p-6">{children}</main>
         </div>
