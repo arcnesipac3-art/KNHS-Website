@@ -16,6 +16,7 @@ import TeacherDashboard from './pages/TeacherDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import MyClasses from './pages/MyClasses'
 import JoinClass from './pages/JoinClass'
+import ClassDetail from './pages/ClassDetail'
 
 const queryClient = new QueryClient()
 
@@ -46,6 +47,7 @@ function App() {
               <Route path="force-password-change" element={<ForcePasswordChange />} />
               <Route path="classes" element={<MyClasses />} />
               <Route path="classes/join" element={<JoinClass />} />
+              <Route path="classes/:id" element={<ClassDetail />} />
               <Route
                 path="assignments"
                 element={
