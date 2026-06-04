@@ -21,6 +21,8 @@ import AssignmentDetail from './pages/AssignmentDetail'
 import CreateAssignment from './pages/CreateAssignment'
 import GradeSubmission from './pages/GradeSubmission'
 import MarkAttendance from './pages/MarkAttendance'
+import AnnouncementList from './pages/AnnouncementList'
+import CreateAnnouncement from './pages/CreateAnnouncement'
 
 const queryClient = new QueryClient()
 
@@ -65,6 +67,8 @@ function App() {
               <Route path="assignments/create" element={<CreateAssignment />} />
               <Route path="submissions/:id" element={<GradeSubmission />} />
               <Route path="attendance/mark" element={<MarkAttendance />} />
+              <Route path="announcements" element={<AnnouncementList />} />
+              <Route path="announcements/create" element={<CreateAnnouncement />} />
               <Route
                 path="grades"
                 element={
@@ -80,15 +84,6 @@ function App() {
                   <PlaceholderPage
                     title="Attendance"
                     description="Daily attendance marking coming in Sprint 4."
-                  />
-                }
-              />
-              <Route
-                path="announcements"
-                element={
-                  <PlaceholderPage
-                    title="Announcements"
-                    description="School and class announcements coming in Sprint 5."
                   />
                 }
               />
