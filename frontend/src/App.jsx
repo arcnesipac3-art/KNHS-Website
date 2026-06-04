@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './features/auth/AuthContext'
 import { ProtectedRoute, PublicOnlyRoute } from './features/auth/ProtectedRoute'
 import PublicLayout from './components/layout/PublicLayout'
+import DebugPanel from './components/ui/DebugPanel'
 import Home from './pages/Home'
 import About from './pages/About'
 import Contact from './pages/Contact'
@@ -180,6 +181,9 @@ function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          
+          {/* Debug Panel - Only visible in development */}
+          <DebugPanel />
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

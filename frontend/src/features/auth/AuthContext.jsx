@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api, { clearAccessToken, setAccessToken } from '../../lib/api'
+import { logAuthState } from '../../utils/devtools'
 
 const AuthContext = createContext(null)
 
@@ -8,16 +9,21 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   const bootstrap = useCallback(async () => {
+    logAuthState('bootstrap:start', { timestamp: new Date().toISOString() })
     try {
       const { data } = await api.post('/auth/refresh/')
+      logAuthState('bootstrap:refresh-success', { access_token: data.access_token?.substring(0, 20) + '...' })
       setAccessToken(data.access_token)
       const me = await api.get('/auth/me/')
+      logAuthState('bootstrap:user-loaded', { user: me.data })
       setUser(me.data)
-    } catch {
+    } catch (error) {
+      logAuthState('bootstrap:failed', { error: error.message, status: error.response?.status })
       clearAccessToken()
       setUser(null)
     } finally {
       setLoading(false)
+      logAuthState('bootstrap:complete', { hasUser: Boolean(user) })
     }
   }, [])
 
@@ -26,20 +32,26 @@ export function AuthProvider({ children }) {
   }, [bootstrap])
 
   const login = async (email, password) => {
+    logAuthState('login:attempt', { email })
     const { data } = await api.post('/auth/login/', { email, password })
+    logAuthState('login:success', { user: data.user, access_token: data.access_token?.substring(0, 20) + '...' })
     setAccessToken(data.access_token)
     setUser(data.user)
     return data.user
   }
 
   const logout = async () => {
+    logAuthState('logout:start', {})
     try {
       await api.post('/auth/logout/')
-    } catch {
+      logAuthState('logout:success', {})
+    } catch (error) {
+      logAuthState('logout:error', { error: error.message })
       // ignore
     } finally {
       clearAccessToken()
       setUser(null)
+      logAuthState('logout:complete', {})
     }
   }
 
