@@ -19,6 +19,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     is_published = serializers.BooleanField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_read = serializers.SerializerMethodField()
+    audience_ref_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Announcement
@@ -33,6 +34,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             "audience_type",
             "audience_type_display",
             "audience_ref_id",
+            "audience_ref_name",
             "audience_metadata",
             "published_at",
             "expires_at",
@@ -53,6 +55,23 @@ class AnnouncementSerializer(serializers.ModelSerializer):
                 announcement=obj, user=request.user
             ).exists()
         return False
+
+    def get_audience_ref_name(self, obj):
+        """Get the name of the audience reference object."""
+        if obj.audience_type == "classroom" and obj.audience_ref_id:
+            try:
+                from apps.academics.models import Classroom
+                classroom = Classroom.objects.get(id=obj.audience_ref_id)
+                return f"{classroom.name} - Grade {classroom.grade_level} {classroom.section}"
+            except Classroom.DoesNotExist:
+                return None
+        elif obj.audience_type == "grade":
+            return obj.audience_metadata.get("grade_level", "")
+        elif obj.audience_type == "strand":
+            return obj.audience_metadata.get("strand_name", "")
+        elif obj.audience_type == "role":
+            return obj.audience_metadata.get("role", "").title()
+        return None
 
 
 class AnnouncementReadSerializer(serializers.ModelSerializer):

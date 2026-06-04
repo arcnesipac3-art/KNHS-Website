@@ -32,10 +32,20 @@ export default function AnnouncementList() {
         const response = await announcementApi.getAll({ exclude_expired: true })
         data = response.data
       }
+      
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error('API returned non-array data:', data)
+        setAnnouncements([])
+        setError('Unexpected data format received. Please try again.')
+        return
+      }
+      
       setAnnouncements(data)
     } catch (err) {
       console.error('Failed to load announcements:', err)
       setError('Failed to load announcements. Please try again.')
+      setAnnouncements([]) // Reset to empty array on error
     } finally {
       setLoading(false)
     }

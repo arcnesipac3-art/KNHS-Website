@@ -307,34 +307,50 @@ export async function getMyPendingAssignments() {
  * Get dashboard data for student
  */
 export async function getStudentDashboard() {
-  const [announcementsRes, notificationsRes, assignmentsRes, gradesRes] = await Promise.all([
-    announcementApi.getUnread(),
-    notificationApi.getAll({ is_read: false }),
-    assignmentApi.getAll({ status: 'published' }),
-    gradeApi.getAll(),
-  ])
+  try {
+    const [announcementsRes, notificationsRes, assignmentsRes, gradesRes] = await Promise.all([
+      announcementApi.getUnread(),
+      notificationApi.getAll({ is_read: false }),
+      assignmentApi.getAll({ status: 'published' }),
+      gradeApi.getAll(),
+    ])
 
-  const { data: submissions } = await submissionApi.getAll()
-  const submittedIds = new Set(submissions.map((s) => s.assignment))
+    const { data: submissions } = await submissionApi.getAll()
+    const submittedIds = new Set(submissions.map((s) => s.assignment))
 
-  const pendingAssignments = assignmentsRes.data.filter(
-    (a) => !submittedIds.has(a.id) && !a.is_overdue
-  )
-  const overdueAssignments = assignmentsRes.data.filter(
-    (a) => !submittedIds.has(a.id) && a.is_overdue
-  )
+    const pendingAssignments = assignmentsRes.data.filter(
+      (a) => !submittedIds.has(a.id) && !a.is_overdue
+    )
+    const overdueAssignments = assignmentsRes.data.filter(
+      (a) => !submittedIds.has(a.id) && a.is_overdue
+    )
 
-  return {
-    unreadAnnouncements: announcementsRes.data,
-    unreadNotifications: notificationsRes.data,
-    pendingAssignments,
-    overdueAssignments,
-    publishedGrades: gradesRes.data.filter((g) => g.status === 'published'),
-    stats: {
-      pendingCount: pendingAssignments.length,
-      overdueCount: overdueAssignments.length,
-      unreadNotifications: notificationsRes.data.length,
-    },
+    return {
+      unreadAnnouncements: Array.isArray(announcementsRes.data) ? announcementsRes.data : [],
+      unreadNotifications: Array.isArray(notificationsRes.data) ? notificationsRes.data : [],
+      pendingAssignments: Array.isArray(pendingAssignments) ? pendingAssignments : [],
+      overdueAssignments: Array.isArray(overdueAssignments) ? overdueAssignments : [],
+      publishedGrades: Array.isArray(gradesRes.data) ? gradesRes.data.filter((g) => g.status === 'published') : [],
+      stats: {
+        pendingCount: pendingAssignments.length || 0,
+        overdueCount: overdueAssignments.length || 0,
+        unreadNotifications: notificationsRes.data?.length || 0,
+      },
+    }
+  } catch (error) {
+    console.error('Error fetching student dashboard:', error)
+    return {
+      unreadAnnouncements: [],
+      unreadNotifications: [],
+      pendingAssignments: [],
+      overdueAssignments: [],
+      publishedGrades: [],
+      stats: {
+        pendingCount: 0,
+        overdueCount: 0,
+        unreadNotifications: 0,
+      },
+    }
   }
 }
 
@@ -342,23 +358,41 @@ export async function getStudentDashboard() {
  * Get dashboard data for teacher
  */
 export async function getTeacherDashboard() {
-  const [assignmentsRes, submissionsRes, gradesRes] = await Promise.all([
-    assignmentApi.getAll(),
-    submissionApi.getAll(),
-    gradeApi.getAll(),
-  ])
+  try {
+    const [assignmentsRes, submissionsRes, gradesRes] = await Promise.all([
+      assignmentApi.getAll(),
+      submissionApi.getAll(),
+      gradeApi.getAll(),
+    ])
 
-  const ungradedSubmissions = submissionsRes.data.filter((s) => s.status === 'submitted' || s.status === 'late')
-  const draftGrades = gradesRes.data.filter((g) => g.status === 'draft' || g.status === 'computed')
+    const ungradedSubmissions = Array.isArray(submissionsRes.data) 
+      ? submissionsRes.data.filter((s) => s.status === 'submitted' || s.status === 'late')
+      : []
+    const draftGrades = Array.isArray(gradesRes.data)
+      ? gradesRes.data.filter((g) => g.status === 'draft' || g.status === 'computed')
+      : []
 
-  return {
-    myAssignments: assignmentsRes.data,
-    ungradedSubmissions,
-    draftGrades,
-    stats: {
-      totalAssignments: assignmentsRes.data.length,
-      ungradedCount: ungradedSubmissions.length,
-      draftGradesCount: draftGrades.length,
-    },
+    return {
+      myAssignments: Array.isArray(assignmentsRes.data) ? assignmentsRes.data : [],
+      ungradedSubmissions,
+      draftGrades,
+      stats: {
+        totalAssignments: assignmentsRes.data?.length || 0,
+        ungradedCount: ungradedSubmissions.length,
+        draftGradesCount: draftGrades.length,
+      },
+    }
+  } catch (error) {
+    console.error('Error fetching teacher dashboard:', error)
+    return {
+      myAssignments: [],
+      ungradedSubmissions: [],
+      draftGrades: [],
+      stats: {
+        totalAssignments: 0,
+        ungradedCount: 0,
+        draftGradesCount: 0,
+      },
+    }
   }
 }
