@@ -14,6 +14,8 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import StudentDashboard from './pages/StudentDashboard'
 import TeacherDashboard from './pages/TeacherDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import MyClasses from './pages/MyClasses'
+import JoinClass from './pages/JoinClass'
 
 const queryClient = new QueryClient()
 
@@ -42,24 +44,8 @@ function App() {
               <Route path="guidance-dashboard" element={<PlaceholderPage title="Guidance Dashboard" description="Student lookup and case management coming in Phase 2." />} />
               <Route path="registrar-dashboard" element={<PlaceholderPage title="Registrar Dashboard" description="Enrollment queue and records management coming soon." />} />
               <Route path="force-password-change" element={<ForcePasswordChange />} />
-              <Route
-                path="classes"
-                element={
-                  <PlaceholderPage
-                    title="My Classes"
-                    description="Classrooms, join codes, and rosters coming in Sprint 2."
-                  />
-                }
-              />
-              <Route
-                path="classes/join"
-                element={
-                  <PlaceholderPage
-                    title="Join Class"
-                    description="Enter your class join code to enroll."
-                  />
-                }
-              />
+              <Route path="classes" element={<MyClasses />} />
+              <Route path="classes/join" element={<JoinClass />} />
               <Route
                 path="assignments"
                 element={
