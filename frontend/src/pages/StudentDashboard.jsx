@@ -44,7 +44,7 @@ export default function StudentDashboard() {
     )
   }
 
-  const currentQuarter = academicYear?.quarters?.find((q) => q.is_active)
+  const currentQuarter = academicYear?.quarters?.find((q) => q.is_active) || null
 
   return (
     <PortalLayout>

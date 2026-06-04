@@ -44,7 +44,7 @@ export default function AdminDashboard() {
     )
   }
 
-  const currentQuarter = academicYear?.quarters?.find((q) => q.is_active)
+  const currentQuarter = academicYear?.quarters?.find((q) => q.is_active) || null
 
   return (
     <PortalLayout>
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
           <p className="text-sm opacity-90">School Administrator</p>
           <h1 className="text-3xl font-bold">{user?.profile?.full_name || user?.email}</h1>
           <p className="mt-1 text-purple-100">System Management & Configuration</p>
-          {currentQuarter && (
+          {currentQuarter && academicYear?.academicYear && (
             <p className="mt-2 text-sm text-purple-200">
               {academicYear.academicYear.label} • {currentQuarter.name}
             </p>
