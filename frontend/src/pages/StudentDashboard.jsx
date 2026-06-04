@@ -44,7 +44,9 @@ export default function StudentDashboard() {
     )
   }
 
-  const currentQuarter = academicYear?.quarters?.find((q) => q.is_active) || null
+  // Safely access quarters - it's at the top level of the response
+  const quarters = Array.isArray(academicYear?.quarters) ? academicYear.quarters : []
+  const currentQuarter = quarters.find((q) => q.is_active) || null
 
   return (
     <PortalLayout>

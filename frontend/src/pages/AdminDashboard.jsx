@@ -20,6 +20,7 @@ export default function AdminDashboard() {
           getCurrentAcademicYearWithQuarters(),
           api.get('/dashboard/'),
         ])
+        console.log('📊 Dashboard data loaded:', { yearData, dashboardData: dashboardData.data })
         setAcademicYear(yearData)
         setStats(dashboardData.data?.widgets?.kpis || {})
       } catch (error) {
@@ -44,7 +45,9 @@ export default function AdminDashboard() {
     )
   }
 
-  const currentQuarter = academicYear?.quarters?.find((q) => q.is_active) || null
+  // Safely access quarters - it's at the top level of the response
+  const quarters = Array.isArray(academicYear?.quarters) ? academicYear.quarters : []
+  const currentQuarter = quarters.find((q) => q.is_active) || null
 
   return (
     <PortalLayout>
@@ -258,7 +261,7 @@ export default function AdminDashboard() {
                     {academicYear?.academicYear?.label || 'Not configured'}
                   </p>
                   <p className="mt-1 text-xs text-muted">
-                    {academicYear?.quarters?.length || 0} quarters defined
+                    {quarters.length || 0} quarters defined
                   </p>
                 </div>
 
