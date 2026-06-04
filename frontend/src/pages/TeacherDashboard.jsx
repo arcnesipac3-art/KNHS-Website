@@ -71,7 +71,7 @@ export default function TeacherDashboard() {
           <Link to="/grades">
             <Button variant="secondary">Input Grades</Button>
           </Link>
-          <Link to="/attendance">
+          <Link to="/attendance/mark">
             <Button variant="secondary">Mark Attendance</Button>
           </Link>
           <Link to="/classes">

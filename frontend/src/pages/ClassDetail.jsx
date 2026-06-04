@@ -310,8 +310,15 @@ function AttendanceTab({ classroomId, enrollments, isTeacher }) {
         </div>
         <h3 className="mt-4 text-lg font-medium text-text">Attendance</h3>
         <p className="mt-2 text-sm text-muted">
-          {isTeacher ? 'Attendance marking interface coming soon' : 'Your attendance records will be shown here'}
+          {isTeacher ? 'Mark daily attendance for your students' : 'Your attendance records will be shown here'}
         </p>
+        {isTeacher && (
+          <div className="mt-6">
+            <Link to={`/attendance/mark?classroom=${classroomId}`}>
+              <Button>Mark Attendance</Button>
+            </Link>
+          </div>
+        )}
       </div>
     </Card>
   )
