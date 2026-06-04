@@ -25,6 +25,8 @@ import AnnouncementList from './pages/AnnouncementList'
 import CreateAnnouncement from './pages/CreateAnnouncement'
 import GradeInput from './pages/GradeInput'
 import StudentGrades from './pages/StudentGrades'
+import Materials from './pages/Materials'
+import UploadMaterial from './pages/UploadMaterial'
 
 const queryClient = new QueryClient()
 
@@ -93,12 +95,11 @@ function App() {
               />
               <Route
                 path="materials"
-                element={
-                  <PlaceholderPage
-                    title="Materials"
-                    description="Learning materials coming soon."
-                  />
-                }
+                element={<Materials />}
+              />
+              <Route
+                path="materials/upload"
+                element={<UploadMaterial />}
               />
               <Route
                 path="people"
