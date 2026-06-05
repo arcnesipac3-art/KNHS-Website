@@ -30,6 +30,17 @@ export default function UserManagement() {
     loadUsers()
   }, [filters])
 
+  useEffect(() => {
+    // Clear messages after 5 seconds
+    if (successMessage || error) {
+      const timer = setTimeout(() => {
+        setSuccessMessage(null)
+        setError(null)
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [successMessage, error])
+
   async function loadUsers() {
     try {
       setLoading(true)
@@ -41,10 +52,12 @@ export default function UserManagement() {
       if (filters.search) params.search = filters.search
 
       const { data } = await userApi.getAll(params)
-      setUsers(data)
+      // Ensure data is always an array
+      setUsers(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Failed to load users:', err)
       setError('Failed to load users. Please try again.')
+      setUsers([]) // Set empty array on error
     } finally {
       setLoading(false)
     }
