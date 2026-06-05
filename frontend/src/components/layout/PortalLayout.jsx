@@ -23,7 +23,7 @@ const NAV_BY_ROLE = {
   ],
   admin: [
     { to: '/dashboard', label: 'Dashboard' },
-    { to: '/people', label: 'People' },
+    { to: '/users', label: 'Users' },
     { to: '/enrollment', label: 'Enrollment' },
     { to: '/classes', label: 'Classes' },
     { to: '/report-cards', label: 'Report Cards' },
@@ -34,6 +34,7 @@ const NAV_BY_ROLE = {
   principal: [
     { to: '/dashboard', label: 'Executive Dashboard' },
     { to: '/approvals', label: 'Approval Center' },
+    { to: '/users', label: 'Users' },
     { to: '/analytics', label: 'Analytics' },
     { to: '/report-cards', label: 'Report Cards' },
     { to: '/announcements', label: 'Announcements' },

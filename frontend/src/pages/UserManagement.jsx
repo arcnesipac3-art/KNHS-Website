@@ -1,86 +1,47 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
-import api from '../lib/api'
-import Button from '../components/ui/Button'
-import Card from '../components/ui/Card'
 import PortalLayout from '../components/layout/PortalLayout'
+import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
+import { userApi } from '../lib/userApi'
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth()
-  const isAdmin = currentUser?.role === 'admin'
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [successMessage, setSuccessMessage] = useState(null)
+
+  // Filters
   const [filters, setFilters] = useState({
-    role: '',
-    is_active: '',
+    role: 'all',
+    is_active: 'all',
     search: '',
   })
-  const [stats, setStats] = useState({
-    total: 0,
-    students: 0,
-    teachers: 0,
-    staff: 0,
-  })
-  const [meta, setMeta] = useState({
-    total: 0,
-    showing: 0,
-  })
 
-  const roleLabels = {
-    student: 'Student',
-    teacher: 'Teacher',
-    admin: 'Admin',
-    principal: 'Principal',
-    guidance: 'Guidance',
-    registrar: 'Registrar',
-  }
-
-  const roleBadgeColors = {
-    student: 'bg-blue-100 text-blue-700',
-    teacher: 'bg-green-100 text-green-700',
-    admin: 'bg-purple-100 text-purple-700',
-    principal: 'bg-gold/20 text-gold',
-    guidance: 'bg-pink-100 text-pink-700',
-    registrar: 'bg-orange-100 text-orange-700',
-  }
+  // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [tempPassword, setTempPassword] = useState(null)
 
   useEffect(() => {
     loadUsers()
   }, [filters])
 
-  const loadUsers = async () => {
+  async function loadUsers() {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
-      if (filters.role) params.append('role', filters.role)
-      if (filters.is_active) params.append('is_active', filters.is_active)
-      if (filters.search) params.append('search', filters.search)
-
-      const response = await api.get(`/users/?${params.toString()}`)
-      const userData = Array.isArray(response.data)
-        ? response.data
-        : Array.isArray(response.data?.results)
-          ? response.data.results
-          : []
-      setUsers(userData)
-      setMeta({
-        total: response.data?.count ?? userData.length,
-        showing: userData.length,
-      })
-
-      // Calculate stats
-      setStats({
-        total: response.data?.count ?? userData.length,
-        students: userData.filter((u) => u.role === 'student').length,
-        teachers: userData.filter((u) => u.role === 'teacher').length,
-        staff: userData.filter((u) =>
-          ['admin', 'principal', 'guidance', 'registrar'].includes(u.role)
-        ).length,
-      })
-
       setError(null)
+
+      const params = {}
+      if (filters.role !== 'all') params.role = filters.role
+      if (filters.is_active !== 'all') params.is_active = filters.is_active
+      if (filters.search) params.search = filters.search
+
+      const { data } = await userApi.getAll(params)
+      setUsers(data)
     } catch (err) {
       console.error('Failed to load users:', err)
       setError('Failed to load users. Please try again.')
@@ -89,361 +50,703 @@ export default function UserManagement() {
     }
   }
 
-  const handleDelete = async (userId, userEmail) => {
-    if (!window.confirm(`Are you sure you want to deactivate ${userEmail}?`)) {
+  async function handleDelete(userId, userName) {
+    if (!confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
       return
     }
 
     try {
-      await api.post(`/users/${userId}/deactivate/`)
+      await userApi.delete(userId)
+      setSuccessMessage(`User ${userName} deleted successfully`)
       loadUsers()
     } catch (err) {
-      console.error('Failed to deactivate user:', err)
-      alert('Failed to deactivate user. Please try again.')
+      setError(err.response?.data?.error || 'Failed to delete user')
     }
   }
 
-  const handleActivate = async (userId) => {
-    try {
-      await api.post(`/users/${userId}/activate/`)
-      loadUsers()
-    } catch (err) {
-      console.error('Failed to activate user:', err)
-      alert('Failed to activate user. Please try again.')
-    }
-  }
 
-  const handlePermanentDelete = async (targetUser) => {
-    const confirmedEmail = window.prompt(
-      `Type the user's email to permanently delete this account:\n\n${targetUser.email}`,
-      '',
-    )
-
-    if (confirmedEmail === null) {
-      return
-    }
-
-    if (confirmedEmail.trim().toLowerCase() !== targetUser.email.toLowerCase()) {
-      alert('Email confirmation did not match. Account was not deleted.')
+  async function handleActivateDeactivate(userId, isActive, userName) {
+    const action = isActive ? 'deactivate' : 'activate'
+    if (!confirm(`Are you sure you want to ${action} ${userName}?`)) {
       return
     }
 
     try {
-      await api.delete(`/users/${targetUser.id}/`)
+      if (isActive) {
+        await userApi.deactivate(userId)
+      } else {
+        await userApi.activate(userId)
+      }
+      setSuccessMessage(`User ${userName} ${action}d successfully`)
       loadUsers()
     } catch (err) {
-      console.error('Failed to delete user:', err)
-      alert(err.response?.data?.error || 'Failed to delete user. Please try again.')
+      setError(err.response?.data?.error || `Failed to ${action} user`)
     }
   }
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
+  async function handleResetPassword(userId, userName) {
+    if (!confirm(`Reset password for ${userName}? They will be forced to change it on next login.`)) {
+      return
+    }
+
+    try {
+      const { data } = await userApi.resetPassword(userId)
+      setTempPassword(data.temporary_password)
+      setShowPasswordModal(true)
+      setSuccessMessage(`Password reset for ${userName}`)
+      loadUsers()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to reset password')
+    }
   }
 
-  if (!['admin', 'principal'].includes(currentUser?.role)) {
+  function openEditModal(user) {
+    setSelectedUser(user)
+    setShowEditModal(true)
+  }
+
+  function closeModals() {
+    setShowCreateModal(false)
+    setShowEditModal(false)
+    setShowPasswordModal(false)
+    setSelectedUser(null)
+    setTempPassword(null)
+  }
+
+  function handleCreateSuccess() {
+    closeModals()
+    setSuccessMessage('User created successfully')
+    loadUsers()
+  }
+
+  function handleUpdateSuccess() {
+    closeModals()
+    setSuccessMessage('User updated successfully')
+    loadUsers()
+  }
+
+
+  // Check permission
+  if (currentUser?.role !== 'admin' && currentUser?.role !== 'principal') {
     return (
       <PortalLayout>
-        <Card>
-          <div className="py-8 text-center">
-            <h2 className="text-lg font-semibold text-text">Access Denied</h2>
-            <p className="mt-2 text-sm text-muted">You do not have permission to manage user accounts.</p>
-          </div>
-        </Card>
+        <div className="mx-auto max-w-4xl py-12 text-center">
+          <h1 className="text-2xl font-bold text-text">Access Denied</h1>
+          <p className="mt-4 text-muted">You don't have permission to access user management.</p>
+        </div>
       </PortalLayout>
     )
   }
 
+  const isAdmin = currentUser?.role === 'admin'
+
   return (
     <PortalLayout>
-      <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-text">User Management</h1>
-          <p className="mt-2 text-muted">Manage student, teacher, and staff accounts</p>
-          <p className="mt-1 text-xs text-muted">
-            Showing {meta.showing} of {meta.total} matching accounts
-          </p>
-        </div>
-        {isAdmin && (
-        <Link to="/users/create">
-          <Button>
-            <svg
-              className="mr-2 h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Create User
-          </Button>
-        </Link>
-        )}
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-4">
-        <Card title="Total Users" subtitle={stats.total.toString()}>
-          <div className="mt-2 text-xs text-muted">All active accounts</div>
-        </Card>
-        <Card title="Students" subtitle={stats.students.toString()}>
-          <div className="mt-2 text-xs text-muted">Enrolled learners</div>
-        </Card>
-        <Card title="Teachers" subtitle={stats.teachers.toString()}>
-          <div className="mt-2 text-xs text-muted">Teaching staff</div>
-        </Card>
-        <Card title="Staff" subtitle={stats.staff.toString()}>
-          <div className="mt-2 text-xs text-muted">Admin, Principal, etc.</div>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text">Search</label>
-          <input
-            type="text"
-            placeholder="Name, email, or LRN..."
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text">Role</label>
-          <select
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
-            value={filters.role}
-            onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-          >
-            <option value="">All Roles</option>
-            <option value="student">Students</option>
-            <option value="teacher">Teachers</option>
-            <option value="admin">Administrators</option>
-            <option value="principal">Principal</option>
-            <option value="guidance">Guidance</option>
-            <option value="registrar">Registrar</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text">Status</label>
-          <select
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
-            value={filters.is_active}
-            onChange={(e) => setFilters({ ...filters, is_active: e.target.value })}
-          >
-            <option value="">All Status</option>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
-        </div>
-
-        {(filters.role || filters.is_active || filters.search) && (
-          <div className="flex items-end">
-            <Button
-              variant="outline"
-              onClick={() => setFilters({ role: '', is_active: '', search: '' })}
-            >
-              Clear Filters
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-text">User Management</h1>
+            <p className="mt-2 text-muted">
+              Manage students, teachers, and staff accounts
+            </p>
+          </div>
+          {isAdmin && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              + Add User
             </Button>
+          )}
+        </div>
+
+        {/* Messages */}
+        {successMessage && (
+          <div className="rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
+            <p className="font-medium text-green-900">{successMessage}</p>
           </div>
         )}
-      </div>
+        {error && (
+          <div className="rounded-lg border-l-4 border-red-500 bg-red-50 p-4">
+            <p className="font-medium text-red-900">{error}</p>
+          </div>
+        )}
 
-      {/* Users Table */}
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-knhs-purple border-t-transparent"></div>
-          <p className="mt-4 text-muted">Loading users...</p>
-        </div>
-      ) : error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
-          <p className="text-red-600">{error}</p>
-          <Button onClick={loadUsers} className="mt-4">
-            Retry
-          </Button>
-        </div>
-      ) : users.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-            />
-          </svg>
-          <p className="mt-4 text-muted">No users found</p>
-          <p className="mt-2 text-sm text-muted">Try adjusting your filters or create a new user</p>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <table className="w-full">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
-                  LRN / Employee ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
-                  Grade / Strand
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
-                  Approval
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-gray-600">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {users.map((listedUser) => (
-                <tr key={listedUser.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="font-medium text-text">{listedUser.full_name || 'N/A'}</div>
-                      <div className="text-sm text-muted">{listedUser.email}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        roleBadgeColors[listedUser.role] || 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {roleLabels[listedUser.role]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted">
-                    {listedUser.lrn || listedUser.employee_id || '—'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted">
-                    {listedUser.grade_level
-                      ? `Grade ${listedUser.grade_level}${listedUser.strand ? ` - ${listedUser.strand}` : ''}`
-                      : '—'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        listedUser.is_active
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {listedUser.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        listedUser.is_approved
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-amber-100 text-amber-700'
-                      }`}
-                    >
-                      {listedUser.is_approved ? 'Approved' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted">{formatDate(listedUser.created_at)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link to={`/users/${listedUser.id}/edit`}>
-                        <button className="rounded p-1 text-knhs-purple hover:bg-purple-50" title="Edit user">
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                      </Link>
-                      {isAdmin && listedUser.is_active ? (
-                        <button
-                          onClick={() => handleDelete(listedUser.id, listedUser.email)}
-                          className="rounded p-1 text-red-600 hover:bg-red-50"
-                          title="Deactivate user"
-                        >
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      ) : isAdmin ? (
-                        <button
-                          onClick={() => handleActivate(listedUser.id)}
-                          className="rounded p-1 text-green-600 hover:bg-green-50"
-                          title="Activate user"
-                        >
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        </button>
-                      ) : null}
-                      {isAdmin && listedUser.role !== 'admin' && listedUser.id !== currentUser?.id && (
-                        <button
-                          onClick={() => handlePermanentDelete(listedUser)}
-                          className="rounded p-1 text-red-800 hover:bg-red-100"
-                          title="Delete account permanently"
-                        >
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
+        {/* Filters */}
+        <Card>
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* Role Filter */}
+            <div>
+              <label className="block text-sm font-medium text-text">Role</label>
+              <select
+                value={filters.role}
+                onChange={(e) => setFilters({ ...filters, role: e.target.value })}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              >
+                <option value="all">All Roles</option>
+                <option value="student">Students</option>
+                <option value="teacher">Teachers</option>
+                <option value="admin">Administrators</option>
+                <option value="principal">Principal</option>
+                <option value="registrar">Registrar</option>
+                <option value="guidance">Guidance</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-text">Status</label>
+              <select
+                value={filters.is_active}
+                onChange={(e) => setFilters({ ...filters, is_active: e.target.value })}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              >
+                <option value="all">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+
+            {/* Search */}
+            <div>
+              <label className="block text-sm font-medium text-text">Search</label>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                placeholder="Name, email, LRN..."
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+          </div>
+        </Card>
+
+
+        {/* User List */}
+        <Card title={`Users (${users.length})`}>
+          {loading ? (
+            <div className="py-12 text-center">
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-purple-200 border-t-knhs-purple"></div>
+              <p className="mt-4 text-muted">Loading users...</p>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="py-12 text-center text-muted">
+              No users found matching your filters.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
+                    <th className="pb-3">Name</th>
+                    <th className="pb-3">Email</th>
+                    <th className="pb-3">Role</th>
+                    <th className="pb-3">ID</th>
+                    <th className="pb-3">Status</th>
+                    {isAdmin && <th className="pb-3 text-right">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {users.map((user) => (
+                    <tr key={user.id} className="text-sm">
+                      <td className="py-4">
+                        <div>
+                          <p className="font-medium text-text">{user.display_name}</p>
+                          {user.profile_grade_level && (
+                            <p className="text-xs text-muted">Grade {user.profile_grade_level}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 text-muted">{user.email}</td>
+                      <td className="py-4">
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                          user.role === 'teacher' ? 'bg-blue-100 text-blue-800' :
+                          user.role === 'student' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                        </span>
+                      </td>
+                      <td className="py-4 text-muted">
+                        {user.profile_lrn || user.profile_employee_id || '—'}
+                      </td>
+                      <td className="py-4">
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          user.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {user.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => openEditModal(user)}
+                              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleResetPassword(user.id, user.display_name)}
+                              className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                            >
+                              Reset Password
+                            </button>
+                            <button
+                              onClick={() => handleActivateDeactivate(user.id, user.is_active, user.display_name)}
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                                user.is_active
+                                  ? 'border-yellow-300 text-yellow-700 hover:bg-yellow-50'
+                                  : 'border-green-300 text-green-700 hover:bg-green-50'
+                              }`}
+                            >
+                              {user.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            {user.role !== 'admin' && (
+                              <button
+                                onClick={() => handleDelete(user.id, user.display_name)}
+                                className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        {/* Modals */}
+        {showCreateModal && (
+          <CreateUserModal
+            onClose={closeModals}
+            onSuccess={handleCreateSuccess}
+          />
+        )}
+
+        {showEditModal && selectedUser && (
+          <EditUserModal
+            user={selectedUser}
+            onClose={closeModals}
+            onSuccess={handleUpdateSuccess}
+          />
+        )}
+
+        {showPasswordModal && tempPassword && (
+          <PasswordModal
+            password={tempPassword}
+            onClose={closeModals}
+          />
+        )}
       </div>
     </PortalLayout>
+  )
+}
+
+
+// Create User Modal
+function CreateUserModal({ onClose, onSuccess }) {
+  const [formData, setFormData] = useState({
+    email: '',
+    role: 'student',
+    first_name: '',
+    last_name: '',
+    lrn: '',
+    employee_id: '',
+    grade_level: '',
+    contact_number: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      await userApi.create(formData)
+      onSuccess()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to create user')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="w-full max-w-2xl rounded-lg bg-white p-6 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-xl font-bold text-text">Create New User</h3>
+
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-text">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text">
+                Role <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              >
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
+                <option value="registrar">Registrar</option>
+                <option value="guidance">Guidance</option>
+                <option value="principal">Principal</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.first_name}
+                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text">
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.last_name}
+                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+
+            {formData.role === 'student' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-text">LRN</label>
+                  <input
+                    type="text"
+                    value={formData.lrn}
+                    onChange={(e) => setFormData({ ...formData, lrn: e.target.value })}
+                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text">Grade Level</label>
+                  <select
+                    value={formData.grade_level}
+                    onChange={(e) => setFormData({ ...formData, grade_level: e.target.value })}
+                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+                  >
+                    <option value="">Select grade</option>
+                    <option value="7">Grade 7</option>
+                    <option value="8">Grade 8</option>
+                    <option value="9">Grade 9</option>
+                    <option value="10">Grade 10</option>
+                    <option value="11">Grade 11</option>
+                    <option value="12">Grade 12</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            {formData.role !== 'student' && (
+              <div>
+                <label className="block text-sm font-medium text-text">Employee ID</label>
+                <input
+                  type="text"
+                  value={formData.employee_id}
+                  onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-text">Contact Number</label>
+              <input
+                type="tel"
+                value={formData.contact_number}
+                onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Creating...' : 'Create User'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+
+// Edit User Modal
+function EditUserModal({ user, onClose, onSuccess }) {
+  const [formData, setFormData] = useState({
+    email: user.email || '',
+    role: user.role || 'student',
+    first_name: user.profile_first_name || '',
+    last_name: user.profile_last_name || '',
+    lrn: user.profile_lrn || '',
+    employee_id: user.profile_employee_id || '',
+    grade_level: user.profile_grade_level || '',
+    contact_number: user.profile_contact_number || '',
+    is_active: user.is_active,
+    is_approved: user.is_approved,
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      await userApi.update(user.id, formData)
+      onSuccess()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update user')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="w-full max-w-2xl rounded-lg bg-white p-6 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-xl font-bold text-text">Edit User</h3>
+        <p className="mt-1 text-sm text-muted">Editing: {user.email}</p>
+
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-text">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text">
+                Role <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              >
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
+                <option value="registrar">Registrar</option>
+                <option value="guidance">Guidance</option>
+                <option value="principal">Principal</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.first_name}
+                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text">
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.last_name}
+                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+
+            {formData.role === 'student' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-text">LRN</label>
+                  <input
+                    type="text"
+                    value={formData.lrn}
+                    onChange={(e) => setFormData({ ...formData, lrn: e.target.value })}
+                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text">Grade Level</label>
+                  <select
+                    value={formData.grade_level}
+                    onChange={(e) => setFormData({ ...formData, grade_level: e.target.value })}
+                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+                  >
+                    <option value="">Select grade</option>
+                    <option value="7">Grade 7</option>
+                    <option value="8">Grade 8</option>
+                    <option value="9">Grade 9</option>
+                    <option value="10">Grade 10</option>
+                    <option value="11">Grade 11</option>
+                    <option value="12">Grade 12</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            {formData.role !== 'student' && (
+              <div>
+                <label className="block text-sm font-medium text-text">Employee ID</label>
+                <input
+                  type="text"
+                  value={formData.employee_id}
+                  onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-text">Contact Number</label>
+              <input
+                type="tel"
+                value={formData.contact_number}
+                onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-gray-200 pt-4">
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="h-5 w-5 rounded border-gray-300 text-knhs-purple"
+              />
+              <span className="text-sm text-text">Account is active</span>
+            </label>
+
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={formData.is_approved}
+                onChange={(e) => setFormData({ ...formData, is_approved: e.target.checked })}
+                className="h-5 w-5 rounded border-gray-300 text-knhs-purple"
+              />
+              <span className="text-sm text-text">Account is approved</span>
+            </label>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Password Modal
+function PasswordModal({ password, onClose }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(password)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-6">
+        <h3 className="text-xl font-bold text-text">Temporary Password Generated</h3>
+        <p className="mt-2 text-sm text-muted">
+          Copy this password and provide it to the user. They must change it on first login.
+        </p>
+
+        <div className="mt-4 rounded-lg bg-gray-100 p-4">
+          <div className="flex items-center justify-between">
+            <code className="text-lg font-mono text-text">{password}</code>
+            <button
+              onClick={handleCopy}
+              className="rounded-lg bg-knhs-purple px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border-l-4 border-yellow-500 bg-yellow-50 p-4">
+          <p className="text-sm text-yellow-800">
+            ⚠️ <strong>Important:</strong> This password will not be shown again. Make sure to copy it before closing.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <Button onClick={onClose} className="w-full">Close</Button>
+        </div>
+      </div>
+    </div>
   )
 }
