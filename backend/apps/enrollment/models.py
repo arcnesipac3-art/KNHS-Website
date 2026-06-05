@@ -7,9 +7,18 @@ from apps.accounts.models import User
 
 
 def generate_tracking_number():
-    """Generate unique tracking number in format ENR-{YEAR}-{RANDOM8}"""
+    """Generate unique tracking number in format ENR-{YEAR}-{RANDOM8} with collision detection."""
+    max_attempts = 10
     year = timezone.now().year
-    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    
+    for _ in range(max_attempts):
+        random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        tracking_number = f'ENR-{year}-{random_part}'
+        
+        if not EnrollmentApplication.objects.filter(tracking_number=tracking_number).exists():
+            return tracking_number
+    
+    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
     return f'ENR-{year}-{random_part}'
 
 
