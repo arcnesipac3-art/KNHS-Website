@@ -195,12 +195,15 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
 
         user = request.user
-        if not user.check_password(serializer.validated_data["old_password"]):
-            logger.warning(f"Failed password change attempt for user: {user.email} (incorrect old password)")
-            return Response(
-                {"error": "Current password is incorrect.", "old_password": ["Current password is incorrect."]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+
+        # If user is on forced password change, skip old_password check
+        if not user.must_change_password:
+            if not user.check_password(serializer.validated_data["old_password"]):
+                logger.warning(f"Failed password change attempt for user: {user.email} (incorrect old password)")
+                return Response(
+                    {"error": "Current password is incorrect.", "old_password": ["Current password is incorrect."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Prevent reusing the same password
         if user.check_password(serializer.validated_data["new_password"]):
