@@ -42,10 +42,12 @@ export default function SchoolSettingsPanel() {
   async function loadSettings() {
     try {
       const { data } = await schoolSettingsApi.get()
-      if (data && data.length > 0) {
-        const settingsData = data[0]
+      // Handle both paginated {results:[]} and plain array responses
+      const list = Array.isArray(data) ? data : (data?.results ?? [])
+      if (list.length > 0) {
+        const settingsData = list[0]
         setSettings(settingsData)
-        setFormData(settingsData)
+        setFormData(prev => ({ ...prev, ...settingsData }))
       }
       setLoading(false)
     } catch (err) {

@@ -114,11 +114,12 @@ export default function ConductRatings() {
           })
         ])
 
-        setEnrollments(enrollmentsRes.data)
+        setEnrollments(Array.isArray(enrollmentsRes.data) ? enrollmentsRes.data : (enrollmentsRes.data?.results ?? []))
 
         // Map existing ratings to [student_id][behavior]
         const ratingsMap = {}
-        ratingsRes.data.forEach((r) => {
+        const ratingsArr = Array.isArray(ratingsRes.data) ? ratingsRes.data : (ratingsRes.data?.results ?? [])
+        ratingsArr.forEach((r) => {
           const studentId = r.class_enrollment.student_id || r.class_enrollment
           if (!ratingsMap[studentId]) ratingsMap[studentId] = {}
           ratingsMap[studentId][r.behavior] = r.rating

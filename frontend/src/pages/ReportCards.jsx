@@ -38,11 +38,12 @@ export default function ReportCards() {
           classroomApi.getAll(),
           academicYearApi.getAll()
         ])
-        setClassrooms(classroomsRes.data)
-        setAcademicYears(yearsRes.data)
+        setClassrooms(Array.isArray(classroomsRes.data) ? classroomsRes.data : (classroomsRes.data?.results ?? []))
+        const yearsList = Array.isArray(yearsRes.data) ? yearsRes.data : (yearsRes.data?.results ?? [])
+        setAcademicYears(yearsList)
 
         // Auto-select current academic year
-        const currentYear = yearsRes.data.find(y => y.is_current)
+        const currentYear = yearsList.find(y => y.is_current)
         if (currentYear) {
           setSelectedAcademicYear(currentYear.id)
         }

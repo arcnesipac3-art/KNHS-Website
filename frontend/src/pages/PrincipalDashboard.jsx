@@ -30,10 +30,10 @@ export default function PrincipalDashboard() {
         ])
 
         setStats({
-          pendingApprovals: gradesRes.data.length,
-          pendingEnrollments: 0, // TODO: Add enrollment endpoint
-          totalStudents: usersRes.data.filter(u => u.role === 'student').length,
-          totalTeachers: usersRes.data.filter(u => u.role === 'teacher').length
+          pendingApprovals: Array.isArray(gradesRes.data) ? gradesRes.data.length : (gradesRes.data?.results?.length ?? 0),
+          pendingEnrollments: 0,
+          totalStudents: (Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.results ?? [])).filter(u => u.role === 'student').length,
+          totalTeachers: (Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.results ?? [])).filter(u => u.role === 'teacher').length
         })
       } catch (error) {
         console.error('Failed to load dashboard:', error)

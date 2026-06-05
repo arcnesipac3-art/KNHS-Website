@@ -37,11 +37,14 @@ export default function AcademicCalendarPanel() {
         academicCalendarApi.getAcademicYears(),
         academicCalendarApi.getEvents()
       ])
-      setAcademicYears(yearsRes.data)
-      setEvents(eventsRes.data)
+      // Handle both paginated {results:[]} and plain array responses
+      const years = Array.isArray(yearsRes.data) ? yearsRes.data : (yearsRes.data?.results ?? [])
+      const events = Array.isArray(eventsRes.data) ? eventsRes.data : (eventsRes.data?.results ?? [])
+      setAcademicYears(years)
+      setEvents(events)
       
       // Set selected year to current year
-      const currentYear = yearsRes.data.find(y => y.is_current)
+      const currentYear = years.find(y => y.is_current)
       if (currentYear) {
         setSelectedYearId(currentYear.id)
       }
@@ -56,7 +59,8 @@ export default function AcademicCalendarPanel() {
   async function loadQuarters(yearId) {
     try {
       const { data } = await academicCalendarApi.getQuarters(yearId)
-      setQuarters(data)
+      // Handle both paginated {results:[]} and plain array responses
+      setQuarters(Array.isArray(data) ? data : (data?.results ?? []))
     } catch (err) {
       console.error('Failed to load quarters:', err)
     }
