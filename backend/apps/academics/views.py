@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import AcademicYear, Quarter, Subject, Classroom, ClassSubject, ClassEnrollment
+from .models import AcademicYear, Quarter, Subject, Classroom, ClassSubject, ClassEnrollment, SchoolEvent
 from .serializers import (
     AcademicYearSerializer,
     QuarterSerializer,
@@ -14,6 +14,7 @@ from .serializers import (
     ClassSubjectSerializer,
     ClassEnrollmentSerializer,
     JoinClassSerializer,
+    SchoolEventSerializer,
 )
 from .permissions import IsAdminUser, IsTeacherUser, IsStudentUser
 
@@ -331,3 +332,49 @@ class ClassEnrollmentViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class SchoolEventViewSet(viewsets.ModelViewSet):
+    """School calendar event management (admin only for CUD)."""
+
+    queryset = SchoolEvent.objects.select_related('academic_year', 'created_by').all()
+    serializer_class = SchoolEventSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Filter by academic year
+        academic_year_id = self.request.query_params.get('academic_year')
+        if academic_year_id:
+            queryset = queryset.filter(academic_year_id=academic_year_id)
+
+        # Filter by event type
+        event_type = self.request.query_params.get('event_type')
+        if event_type:
+            queryset = queryset.filter(event_type=event_type)
+
+        # Filter by date range
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(start_date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(
+                Q(end_date__lte=end_date) | Q(end_date__isnull=True, start_date__lte=end_date)
+            )
+
+        # School-wide only filter
+        if self.request.query_params.get('school_wide') == 'true':
+            queryset = queryset.filter(is_school_wide=True)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Set created_by to current user."""
+        serializer.save(created_by=self.request.user)

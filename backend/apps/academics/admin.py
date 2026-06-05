@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AcademicYear, Quarter, Subject, Classroom, ClassSubject, ClassEnrollment
+from .models import AcademicYear, Quarter, Subject, Classroom, ClassSubject, ClassEnrollment, SchoolEvent
 
 
 @admin.register(AcademicYear)
@@ -66,3 +66,12 @@ class ClassEnrollmentAdmin(admin.ModelAdmin):
     search_fields = ["student__email", "student__profile__lrn", "classroom__name"]
     ordering = ["-enrolled_at"]
     readonly_fields = ["enrolled_at", "created_at", "updated_at"]
+
+
+@admin.register(SchoolEvent)
+class SchoolEventAdmin(admin.ModelAdmin):
+    list_display = ["title", "event_type", "start_date", "end_date", "academic_year", "is_school_wide", "created_by"]
+    list_filter = ["event_type", "is_school_wide", "academic_year"]
+    search_fields = ["title", "description"]
+    ordering = ["-start_date"]
+    readonly_fields = ["created_by", "created_at", "updated_at"]

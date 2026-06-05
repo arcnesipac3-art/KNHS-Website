@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.serializers import UserSerializer, UserProfileSerializer
-from .models import AcademicYear, Quarter, Subject, Classroom, ClassSubject, ClassEnrollment
+from .models import AcademicYear, Quarter, Subject, Classroom, ClassSubject, ClassEnrollment, SchoolEvent
 
 
 class AcademicYearSerializer(serializers.ModelSerializer):
@@ -207,3 +207,48 @@ class JoinClassSerializer(serializers.Serializer):
             raise serializers.ValidationError("This class is full")
 
         return value.upper()
+
+
+
+class SchoolEventSerializer(serializers.ModelSerializer):
+    """Serializer for school calendar events."""
+    
+    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.display_name', read_only=True)
+    academic_year_label = serializers.CharField(source='academic_year.label', read_only=True)
+    is_multi_day = serializers.BooleanField(read_only=True)
+    duration_days = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        model = SchoolEvent
+        fields = [
+            'id',
+            'title',
+            'description',
+            'event_type',
+            'event_type_display',
+            'start_date',
+            'end_date',
+            'academic_year',
+            'academic_year_label',
+            'is_school_wide',
+            'is_multi_day',
+            'duration_days',
+            'created_by',
+            'created_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+    
+    def validate(self, data):
+        """Validate that end_date is after start_date."""
+        start = data.get('start_date')
+        end = data.get('end_date')
+        
+        if end and start and end < start:
+            raise serializers.ValidationError({
+                'end_date': 'End date must be after start date'
+            })
+        
+        return data

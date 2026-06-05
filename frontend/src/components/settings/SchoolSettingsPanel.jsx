@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Button from '../ui/Button'
 import { schoolSettingsApi } from '../../lib/settingsApi'
+import AcademicCalendarPanelComponent from './AcademicCalendarPanel'
 
 export default function SchoolSettingsPanel() {
   const [settings, setSettings] = useState(null)
@@ -94,7 +95,7 @@ export default function SchoolSettingsPanel() {
     { id: 'branding', label: 'Branding', icon: '🎨' },
     { id: 'enrollment', label: 'Enrollment', icon: '📝' },
     { id: 'security', label: 'Security', icon: '🔒' },
-    { id: 'calendar', label: 'Academic Calendar', icon: '📅', badge: 'Coming Soon' },
+    { id: 'calendar', label: 'Academic Calendar', icon: '📅' },
   ]
 
   return (
@@ -173,12 +174,9 @@ export default function SchoolSettingsPanel() {
         <SecuritySection formData={formData} onChange={handleChange} />
       )}
 
-      {/* Academic Calendar Coming Soon */}
+      {/* Academic Calendar Section */}
       {activeSection === 'calendar' && (
-        <ComingSoonSection 
-          title="Academic Calendar Management"
-          description="Manage quarters, academic years, grading periods, and school events."
-        />
+        <AcademicCalendarSection />
       )}
 
       {/* Save Button */}
@@ -502,4 +500,8 @@ function ComingSoonSection({ title, description }) {
       </div>
     </div>
   )
+}
+
+function AcademicCalendarSection() {
+  return <AcademicCalendarPanelComponent />
 }

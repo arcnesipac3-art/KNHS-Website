@@ -5,6 +5,7 @@ import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import SchoolSettingsPanelComponent from '../components/settings/SchoolSettingsPanel'
+import AcademicCalendarPanelComponent from '../components/settings/AcademicCalendarPanel'
 
 const BASE_TABS = [
   {

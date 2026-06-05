@@ -264,3 +264,70 @@ class ClassEnrollment(models.Model):
 
     def __str__(self):
         return f"{self.student.display_name} in {self.classroom}"
+
+
+
+class SchoolEvent(models.Model):
+    """School calendar events (holidays, activities, deadlines)."""
+    
+    EVENT_TYPE_CHOICES = [
+        ('holiday', 'Holiday'),
+        ('activity', 'School Activity'),
+        ('deadline', 'Deadline'),
+        ('exam', 'Examination'),
+        ('meeting', 'Meeting'),
+        ('other', 'Other'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, default='other')
+    start_date = models.DateField()
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Optional for multi-day events"
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.CASCADE,
+        related_name='events',
+        null=True,
+        blank=True,
+        help_text="Optional: Link to specific academic year"
+    )
+    is_school_wide = models.BooleanField(
+        default=True,
+        help_text="Visible to all users vs specific groups"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_events'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['start_date', 'title']
+        indexes = [
+            models.Index(fields=['start_date', 'end_date']),
+            models.Index(fields=['event_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} ({self.start_date})"
+    
+    @property
+    def is_multi_day(self):
+        """Check if event spans multiple days."""
+        return self.end_date and self.end_date > self.start_date
+    
+    @property
+    def duration_days(self):
+        """Calculate event duration in days."""
+        if not self.end_date:
+            return 1
+        return (self.end_date - self.start_date).days + 1
