@@ -5,6 +5,8 @@ Fixed critical bugs preventing the User Management feature from working in produ
 
 **Status:** ✅ All fixes deployed (waiting for Vercel/Render redeploy)
 
+**Latest Critical Fix:** Bug #4 - Users not appearing in list after creation
+
 ---
 
 ## Bug #1: User List Page Crash ✅ FIXED
@@ -117,12 +119,64 @@ await api.post('/auth/change-password/', {
 
 ---
 
+## Bug #4: Created Users Not Appearing in List ✅ FIXED
+
+### Issue
+```
+No users found
+Try adjusting your filters or create a new user
+```
+
+Users were successfully created (201 Created), but didn't appear in the user list.
+
+### Root Cause
+**Duplicate Profile Creation Conflict:**
+
+1. **Signal auto-creates profile** when user is created:
+   ```python
+   @receiver(post_save, sender=User)
+   def create_user_profile(sender, instance, created, **kwargs):
+       if created:
+           UserProfile.objects.get_or_create(user=instance)
+   ```
+
+2. **Serializer tried to create ANOTHER profile:**
+   ```python
+   UserProfile.objects.create(user=user, **profile_fields)  # ❌ CONFLICT
+   ```
+
+3. Django's `OneToOneField` constraint prevented duplicate
+4. Result: User created but profile corrupt/incomplete
+5. Query with `select_related('profile')` skipped users with bad profiles
+
+### Fix Applied
+
+**File:** `backend/apps/accounts/serializers.py`
+
+```python
+# BEFORE (tried to create duplicate):
+UserProfile.objects.create(user=user, **profile_fields)
+
+# AFTER (update existing profile):
+profile = user.profile  # Get profile created by signal
+for field, value in profile_fields.items():
+    setattr(profile, field, value)
+profile.save()
+```
+
+**Strategy:** Update the signal-created profile instead of creating a new one.
+
+**Commit:** `5c311f7` - "fix: update profile instead of creating duplicate (signal already creates it)"
+
+---
+
 ## Deployment Timeline
 
 ### Commits Pushed
 1. `599e6c0` - Defensive array check (User list page)
 2. `bd2452b/85e30d5` - Grade level validation fix (User creation)
 3. `0fd17a7` - Password change field name fix
+4. `5c311f7` - Profile duplication fix (CRITICAL - users now appear in list)
 
 ### Auto-Deploy Triggered 🔄
 - **Vercel (Frontend):** ~2-3 minutes per deployment
