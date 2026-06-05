@@ -14,32 +14,32 @@ export const academicYearApi = {
   /**
    * Get all academic years
    */
-  getAll: () => api.get('/academics/academic-years/'),
+  getAll: () => api.get('/academic-years/'),
 
   /**
    * Get single academic year
    */
-  getById: (id) => api.get(`/academics/academic-years/${id}/`),
+  getById: (id) => api.get(`/academic-years/${id}/`),
 
   /**
    * Create new academic year (admin only)
    */
-  create: (data) => api.post('/academics/academic-years/', data),
+  create: (data) => api.post('/academic-years/', data),
 
   /**
    * Update academic year (admin only)
    */
-  update: (id, data) => api.patch(`/academics/academic-years/${id}/`, data),
+  update: (id, data) => api.patch(`/academic-years/${id}/`, data),
 
   /**
    * Delete academic year (admin only)
    */
-  delete: (id) => api.delete(`/academics/academic-years/${id}/`),
+  delete: (id) => api.delete(`/academic-years/${id}/`),
 
   /**
    * Set as current academic year (admin only)
    */
-  setCurrent: (id) => api.post(`/academics/academic-years/${id}/set_current/`),
+  setCurrent: (id) => api.post(`/academic-years/${id}/set_current/`),
 }
 
 // ============================================================================
@@ -52,28 +52,28 @@ export const quarterApi = {
    */
   getAll: (academicYearId) => {
     const params = academicYearId ? { academic_year: academicYearId } : {}
-    return api.get('/academics/quarters/', { params })
+    return api.get('/quarters/', { params })
   },
 
   /**
    * Get single quarter
    */
-  getById: (id) => api.get(`/academics/quarters/${id}/`),
+  getById: (id) => api.get(`/quarters/${id}/`),
 
   /**
    * Create new quarter (admin only)
    */
-  create: (data) => api.post('/academics/quarters/', data),
+  create: (data) => api.post('/quarters/', data),
 
   /**
    * Update quarter (admin only)
    */
-  update: (id, data) => api.patch(`/academics/quarters/${id}/`, data),
+  update: (id, data) => api.patch(`/quarters/${id}/`, data),
 
   /**
    * Delete quarter (admin only)
    */
-  delete: (id) => api.delete(`/academics/quarters/${id}/`),
+  delete: (id) => api.delete(`/quarters/${id}/`),
 }
 
 // ============================================================================
@@ -85,27 +85,27 @@ export const subjectApi = {
    * Get all subjects with optional filters
    * @param {Object} filters - { grade_level, strand, active_only }
    */
-  getAll: (filters = {}) => api.get('/academics/subjects/', { params: filters }),
+  getAll: (filters = {}) => api.get('/subjects/', { params: filters }),
 
   /**
    * Get single subject
    */
-  getById: (id) => api.get(`/academics/subjects/${id}/`),
+  getById: (id) => api.get(`/subjects/${id}/`),
 
   /**
    * Create new subject (admin only)
    */
-  create: (data) => api.post('/academics/subjects/', data),
+  create: (data) => api.post('/subjects/', data),
 
   /**
    * Update subject (admin only)
    */
-  update: (id, data) => api.patch(`/academics/subjects/${id}/`, data),
+  update: (id, data) => api.patch(`/subjects/${id}/`, data),
 
   /**
    * Delete subject (admin only)
    */
-  delete: (id) => api.delete(`/academics/subjects/${id}/`),
+  delete: (id) => api.delete(`/subjects/${id}/`),
 }
 
 // ============================================================================
@@ -117,37 +117,37 @@ export const classroomApi = {
    * Get all classrooms with optional filters
    * @param {Object} filters - { academic_year, grade_level, advised }
    */
-  getAll: (filters = {}) => api.get('/academics/classrooms/', { params: filters }),
+  getAll: (filters = {}) => api.get('/classrooms/', { params: filters }),
 
   /**
    * Get single classroom detail (includes join_code for teacher/admin)
    */
-  getById: (id) => api.get(`/academics/classrooms/${id}/`),
+  getById: (id) => api.get(`/classrooms/${id}/`),
 
   /**
    * Create new classroom (admin only)
    */
-  create: (data) => api.post('/academics/classrooms/', data),
+  create: (data) => api.post('/classrooms/', data),
 
   /**
    * Update classroom (admin only)
    */
-  update: (id, data) => api.patch(`/academics/classrooms/${id}/`, data),
+  update: (id, data) => api.patch(`/classrooms/${id}/`, data),
 
   /**
    * Delete classroom (admin only)
    */
-  delete: (id) => api.delete(`/academics/classrooms/${id}/`),
+  delete: (id) => api.delete(`/classrooms/${id}/`),
 
   /**
    * Join classroom using join code (student only)
    */
-  join: (joinCode) => api.post('/academics/classrooms/join/', { join_code: joinCode }),
+  join: (joinCode) => api.post('/classrooms/join/', { join_code: joinCode }),
 
   /**
    * Regenerate join code for classroom (adviser/admin only)
    */
-  regenerateCode: (id) => api.post(`/academics/classrooms/${id}/regenerate_code/`),
+  regenerateCode: (id) => api.post(`/classrooms/${id}/regenerate_code/`),
 
   /**
    * Get enrollments for a classroom
@@ -156,7 +156,7 @@ export const classroomApi = {
    */
   getEnrollments: (id, status) => {
     const params = status ? { status } : {}
-    return api.get(`/academics/classrooms/${id}/enrollments/`, { params })
+    return api.get(`/classrooms/${id}/enrollments/`, { params })
   },
 }
 
@@ -169,27 +169,27 @@ export const classSubjectApi = {
    * Get all class subjects with optional filters
    * @param {Object} filters - { classroom }
    */
-  getAll: (filters = {}) => api.get('/academics/class-subjects/', { params: filters }),
+  getAll: (filters = {}) => api.get('/class-subjects/', { params: filters }),
 
   /**
    * Get single class subject
    */
-  getById: (id) => api.get(`/academics/class-subjects/${id}/`),
+  getById: (id) => api.get(`/class-subjects/${id}/`),
 
   /**
    * Create new class subject (admin only)
    */
-  create: (data) => api.post('/academics/class-subjects/', data),
+  create: (data) => api.post('/class-subjects/', data),
 
   /**
    * Update class subject (admin only)
    */
-  update: (id, data) => api.patch(`/academics/class-subjects/${id}/`, data),
+  update: (id, data) => api.patch(`/class-subjects/${id}/`, data),
 
   /**
    * Delete class subject (admin only)
    */
-  delete: (id) => api.delete(`/academics/class-subjects/${id}/`),
+  delete: (id) => api.delete(`/class-subjects/${id}/`),
 }
 
 // ============================================================================
@@ -201,33 +201,33 @@ export const enrollmentApi = {
    * Get all enrollments with optional filters
    * @param {Object} filters - { classroom, student, status }
    */
-  getAll: (filters = {}) => api.get('/academics/enrollments/', { params: filters }),
+  getAll: (filters = {}) => api.get('/enrollments/', { params: filters }),
 
   /**
    * Get single enrollment
    */
-  getById: (id) => api.get(`/academics/enrollments/${id}/`),
+  getById: (id) => api.get(`/enrollments/${id}/`),
 
   /**
    * Create new enrollment (admin only)
    */
-  create: (data) => api.post('/academics/enrollments/', data),
+  create: (data) => api.post('/enrollments/', data),
 
   /**
    * Update enrollment (admin only)
    */
-  update: (id, data) => api.patch(`/academics/enrollments/${id}/`, data),
+  update: (id, data) => api.patch(`/enrollments/${id}/`, data),
 
   /**
    * Delete enrollment (admin only)
    */
-  delete: (id) => api.delete(`/academics/enrollments/${id}/`),
+  delete: (id) => api.delete(`/enrollments/${id}/`),
 
   /**
    * Transfer student to different classroom (admin only)
    */
   transfer: (id, newClassroomId) =>
-    api.post(`/academics/enrollments/${id}/transfer/`, { new_classroom_id: newClassroomId }),
+    api.post(`/enrollments/${id}/transfer/`, { new_classroom_id: newClassroomId }),
 }
 
 // ============================================================================
@@ -236,36 +236,36 @@ export const enrollmentApi = {
 
 export const academicCalendarApi = {
   // Academic Years
-  getAcademicYears: () => api.get('/academics/academic-years/'),
+  getAcademicYears: () => api.get('/academic-years/'),
   
-  createAcademicYear: (data) => api.post('/academics/academic-years/', data),
+  createAcademicYear: (data) => api.post('/academic-years/', data),
   
-  updateAcademicYear: (id, data) => api.patch(`/academics/academic-years/${id}/`, data),
+  updateAcademicYear: (id, data) => api.patch(`/academic-years/${id}/`, data),
   
-  deleteAcademicYear: (id) => api.delete(`/academics/academic-years/${id}/`),
+  deleteAcademicYear: (id) => api.delete(`/academic-years/${id}/`),
   
-  setCurrentAcademicYear: (id) => api.post(`/academics/academic-years/${id}/set_current/`),
+  setCurrentAcademicYear: (id) => api.post(`/academic-years/${id}/set_current/`),
 
   // Quarters
   getQuarters: (academicYearId = null) => {
     const params = academicYearId ? { academic_year: academicYearId } : {}
-    return api.get('/academics/quarters/', { params })
+    return api.get('/quarters/', { params })
   },
   
-  createQuarter: (data) => api.post('/academics/quarters/', data),
+  createQuarter: (data) => api.post('/quarters/', data),
   
-  updateQuarter: (id, data) => api.patch(`/academics/quarters/${id}/`, data),
+  updateQuarter: (id, data) => api.patch(`/quarters/${id}/`, data),
   
-  deleteQuarter: (id) => api.delete(`/academics/quarters/${id}/`),
+  deleteQuarter: (id) => api.delete(`/quarters/${id}/`),
 
   // School Events
-  getEvents: (filters = {}) => api.get('/academics/events/', { params: filters }),
+  getEvents: (filters = {}) => api.get('/events/', { params: filters }),
   
-  createEvent: (data) => api.post('/academics/events/', data),
+  createEvent: (data) => api.post('/events/', data),
   
-  updateEvent: (id, data) => api.patch(`/academics/events/${id}/`, data),
+  updateEvent: (id, data) => api.patch(`/events/${id}/`, data),
   
-  deleteEvent: (id) => api.delete(`/academics/events/${id}/`),
+  deleteEvent: (id) => api.delete(`/events/${id}/`),
 }
 
 // ============================================================================
