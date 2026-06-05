@@ -170,6 +170,7 @@ class GradePublishEvent(models.Model):
         ("published", "Published"),
         ("unlocked", "Unlocked"),
         ("edited", "Edited"),
+        ("reviewed", "Reviewed"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -187,9 +188,50 @@ class GradePublishEvent(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['grade', '-created_at']),
+            models.Index(fields=['action', '-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.action} - {self.grade} by {self.actor}"
+
+
+class GradeReviewComment(models.Model):
+    """Review comments for grade approval workflow."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    class_subject = models.ForeignKey(
+        ClassSubject, 
+        on_delete=models.CASCADE, 
+        related_name="grade_review_comments"
+    )
+    quarter = models.ForeignKey(
+        Quarter, 
+        on_delete=models.CASCADE, 
+        related_name="grade_review_comments"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="grade_review_comments",
+    )
+    comment = models.TextField(help_text="Review comment or feedback")
+    is_internal = models.BooleanField(
+        default=False,
+        help_text="Internal notes visible only to principals/admins"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['class_subject', 'quarter', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"Review comment on {self.class_subject} Q{self.quarter.number} by {self.author}"
 
 
 class ConductRating(models.Model):

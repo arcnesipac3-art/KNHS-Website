@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Grade, GradePublishEvent, ConductRating
+from .models import Grade, GradePublishEvent, ConductRating, GradeReviewComment
 
 
 class GradeSerializer(serializers.ModelSerializer):
@@ -132,3 +132,51 @@ class ConductRatingInputSerializer(serializers.Serializer):
     core_value = serializers.ChoiceField(choices=ConductRating.CORE_VALUE_CHOICES)
     behavior = serializers.CharField(max_length=255)
     rating = serializers.ChoiceField(choices=ConductRating.RATING_CHOICES)
+
+
+class BulkGradeWorkflowSerializer(serializers.Serializer):
+    """Serializer for bulk approve/reject operations."""
+    items = serializers.ListField(
+        child=serializers.DictField(child=serializers.CharField()),
+        min_length=1,
+        help_text="List of {class_subject_id, quarter_id} dictionaries"
+    )
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    
+    def validate_items(self, value):
+        """Validate that each item has required fields."""
+        for item in value:
+            if 'class_subject_id' not in item or 'quarter_id' not in item:
+                raise serializers.ValidationError(
+                    "Each item must have 'class_subject_id' and 'quarter_id'"
+                )
+        return value
+
+
+class GradeReviewCommentSerializer(serializers.ModelSerializer):
+    """Serializer for grade review comments."""
+    author_name = serializers.CharField(source="author.display_name", read_only=True)
+    author_role = serializers.CharField(source="author.role", read_only=True)
+    
+    class Meta:
+        model = GradeReviewComment
+        fields = [
+            "id",
+            "class_subject",
+            "quarter",
+            "author",
+            "author_name",
+            "author_role",
+            "comment",
+            "is_internal",
+            "created_at",
+        ]
+        read_only_fields = ["id", "author", "created_at"]
+
+
+class GradeReviewCommentInputSerializer(serializers.Serializer):
+    """Serializer for creating grade review comments."""
+    class_subject_id = serializers.UUIDField()
+    quarter_id = serializers.UUIDField()
+    comment = serializers.CharField(min_length=10, max_length=2000)
+    is_internal = serializers.BooleanField(default=False)

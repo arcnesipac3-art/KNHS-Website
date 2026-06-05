@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from apps.academics.models import ClassEnrollment, ClassSubject, Quarter, AcademicYear
 from apps.academics.permissions import IsAdminOrPrincipal, IsAdminUser, IsTeacherUser
 from apps.communications.models import Notification
-from .models import Grade, GradePublishEvent, ConductRating
+from .models import Grade, GradePublishEvent, ConductRating, GradeReviewComment
 from .pagination import GradePagination
 from .reports import SF9Generator
 from .sf9_generator import SF9Generator as NewSF9Generator, generate_class_sf9_batch
@@ -24,6 +24,9 @@ from .serializers import (
     UnlockGradeSerializer,
     ConductRatingSerializer,
     ConductRatingInputSerializer,
+    BulkGradeWorkflowSerializer,
+    GradeReviewCommentSerializer,
+    GradeReviewCommentInputSerializer,
 )
 
 
@@ -516,6 +519,302 @@ class GradeViewSet(viewsets.ModelViewSet):
 
         queue.sort(key=lambda item: item["latest_submitted_at"] or "", reverse=True)
         return Response(queue)
+
+    @action(detail=False, methods=["post"])
+    def bulk_approve(self, request):
+        """Bulk approve multiple grade sets at once."""
+        if request.user.role not in ["principal", "admin"]:
+            return Response(
+                {"error": "Only principals and admins can approve grades"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = BulkGradeWorkflowSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        items = serializer.validated_data["items"]
+        reason = serializer.validated_data.get("reason", "Bulk approval by principal")
+
+        total_published = 0
+        results = []
+
+        with transaction.atomic():
+            for item in items:
+                class_subject_id = item["class_subject_id"]
+                quarter_id = item["quarter_id"]
+
+                grades = Grade.objects.filter(
+                    class_subject_id=class_subject_id,
+                    quarter_id=quarter_id,
+                    status="pending_approval",
+                ).select_related("class_subject", "quarter", "class_enrollment__student")
+
+                if not grades.exists():
+                    results.append({
+                        "class_subject_id": class_subject_id,
+                        "quarter_id": quarter_id,
+                        "status": "skipped",
+                        "message": "No pending grades found"
+                    })
+                    continue
+
+                published_count = 0
+                students_to_notify = []
+
+                for grade in grades:
+                    grade.status = "published"
+                    grade.save(update_fields=["status", "updated_at"])
+                    GradePublishEvent.objects.create(
+                        grade=grade,
+                        action="approved",
+                        actor=request.user,
+                        reason=reason,
+                    )
+                    GradePublishEvent.objects.create(
+                        grade=grade,
+                        action="published",
+                        actor=request.user,
+                        reason=reason,
+                        metadata={"bulk_operation": True},
+                    )
+                    students_to_notify.append(grade.class_enrollment.student)
+                    published_count += 1
+
+                if students_to_notify:
+                    first_grade = grades.first()
+                    _notify_users(
+                        students_to_notify,
+                        "grade",
+                        "Grades published",
+                        f"Your {first_grade.class_subject.subject.name} grade for {first_grade.quarter.name} is now available.",
+                        "/grades",
+                    )
+
+                total_published += published_count
+                results.append({
+                    "class_subject_id": class_subject_id,
+                    "quarter_id": quarter_id,
+                    "status": "success",
+                    "count": published_count
+                })
+
+        return Response({
+            "message": f"Bulk approved {total_published} grades across {len(items)} grade sets",
+            "total_published": total_published,
+            "results": results
+        })
+
+    @action(detail=False, methods=["post"])
+    def bulk_reject(self, request):
+        """Bulk reject multiple grade sets at once."""
+        if request.user.role not in ["principal", "admin"]:
+            return Response(
+                {"error": "Only principals and admins can reject grades"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = BulkGradeWorkflowSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        reason = serializer.validated_data.get("reason", "").strip()
+        if len(reason) < 10:
+            return Response(
+                {"error": "A rejection reason with at least 10 characters is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items = serializer.validated_data["items"]
+        total_rejected = 0
+        results = []
+        teachers_notified = set()
+
+        with transaction.atomic():
+            for item in items:
+                class_subject_id = item["class_subject_id"]
+                quarter_id = item["quarter_id"]
+
+                grades = Grade.objects.filter(
+                    class_subject_id=class_subject_id,
+                    quarter_id=quarter_id,
+                    status="pending_approval",
+                ).select_related("class_subject", "quarter")
+
+                if not grades.exists():
+                    results.append({
+                        "class_subject_id": class_subject_id,
+                        "quarter_id": quarter_id,
+                        "status": "skipped",
+                        "message": "No pending grades found"
+                    })
+                    continue
+
+                rejected_count = 0
+                for grade in grades:
+                    grade.status = "computed"
+                    grade.save(update_fields=["status", "updated_at"])
+                    GradePublishEvent.objects.create(
+                        grade=grade,
+                        action="edited",
+                        actor=request.user,
+                        reason=reason,
+                        metadata={"result": "rejected", "bulk_operation": True},
+                    )
+                    rejected_count += 1
+
+                teacher = grades.first().class_subject.teacher if grades.first() else None
+                if teacher and teacher.id not in teachers_notified:
+                    first_grade = grades.first()
+                    _notify_users(
+                        [teacher],
+                        "grade",
+                        "Grades returned for revision",
+                        f"Multiple grade sets need updates. Please check the approval center.",
+                        "/grades/input",
+                    )
+                    teachers_notified.add(teacher.id)
+
+                total_rejected += rejected_count
+                results.append({
+                    "class_subject_id": class_subject_id,
+                    "quarter_id": quarter_id,
+                    "status": "success",
+                    "count": rejected_count
+                })
+
+        return Response({
+            "message": f"Bulk rejected {total_rejected} grades across {len(items)} grade sets",
+            "total_rejected": total_rejected,
+            "results": results
+        })
+
+    @action(detail=False, methods=["post"])
+    def add_review_comment(self, request):
+        """Add a review comment to a grade set."""
+        if request.user.role not in ["principal", "admin", "teacher"]:
+            return Response(
+                {"error": "Only teachers, principals and admins can add review comments"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = GradeReviewCommentInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            class_subject = ClassSubject.objects.get(id=serializer.validated_data["class_subject_id"])
+            quarter = Quarter.objects.get(id=serializer.validated_data["quarter_id"])
+        except (ClassSubject.DoesNotExist, Quarter.DoesNotExist):
+            return Response(
+                {"error": "Invalid class_subject_id or quarter_id"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        comment = GradeReviewComment.objects.create(
+            class_subject=class_subject,
+            quarter=quarter,
+            author=request.user,
+            comment=serializer.validated_data["comment"],
+            is_internal=serializer.validated_data.get("is_internal", False),
+        )
+
+        return Response(
+            GradeReviewCommentSerializer(comment).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=False, methods=["get"])
+    def review_comments(self, request):
+        """Get review comments for a grade set."""
+        class_subject_id = request.query_params.get("class_subject")
+        quarter_id = request.query_params.get("quarter")
+
+        if not class_subject_id or not quarter_id:
+            return Response(
+                {"error": "class_subject and quarter parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        comments = GradeReviewComment.objects.filter(
+            class_subject_id=class_subject_id,
+            quarter_id=quarter_id,
+        ).select_related("author")
+
+        # Filter internal comments for non-admin/principal users
+        if request.user.role not in ["principal", "admin"]:
+            comments = comments.filter(is_internal=False)
+
+        serializer = GradeReviewCommentSerializer(comments, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def approval_history(self, request):
+        """Get approval history for all grade sets or specific grade set."""
+        class_subject_id = request.query_params.get("class_subject")
+        quarter_id = request.query_params.get("quarter")
+        limit = int(request.query_params.get("limit", 50))
+
+        # Base query for approval-related events
+        events = GradePublishEvent.objects.filter(
+            action__in=["submitted", "approved", "published", "edited", "reviewed"]
+        ).select_related(
+            "grade",
+            "grade__class_subject",
+            "grade__class_subject__subject",
+            "grade__class_subject__classroom",
+            "grade__quarter",
+            "actor"
+        )
+
+        # Filter by specific grade set if provided
+        if class_subject_id and quarter_id:
+            events = events.filter(
+                grade__class_subject_id=class_subject_id,
+                grade__quarter_id=quarter_id
+            )
+        
+        # Order and limit
+        events = events.order_by("-created_at")[:limit]
+
+        # Group events by grade set
+        grouped = defaultdict(list)
+        for event in events:
+            key = f"{event.grade.class_subject_id}:{event.grade.quarter_id}"
+            grouped[key].append({
+                "id": str(event.id),
+                "action": event.action,
+                "action_display": event.get_action_display(),
+                "actor_name": event.actor.display_name if event.actor else "System",
+                "actor_role": event.actor.role if event.actor else None,
+                "reason": event.reason,
+                "metadata": event.metadata,
+                "created_at": event.created_at,
+                "class_subject_id": str(event.grade.class_subject_id),
+                "quarter_id": str(event.grade.quarter_id),
+                "subject_name": event.grade.class_subject.subject.name,
+                "classroom_name": event.grade.class_subject.classroom.name,
+                "quarter_name": event.grade.quarter.name,
+            })
+
+        # Convert to list format
+        history = [
+            {
+                "class_subject_id": key.split(":")[0],
+                "quarter_id": key.split(":")[1],
+                "subject_name": events_list[0]["subject_name"] if events_list else "",
+                "classroom_name": events_list[0]["classroom_name"] if events_list else "",
+                "quarter_name": events_list[0]["quarter_name"] if events_list else "",
+                "events": events_list,
+                "latest_event_at": events_list[0]["created_at"] if events_list else None,
+            }
+            for key, events_list in grouped.items()
+        ]
+
+        # Sort by latest event
+        history.sort(key=lambda x: x["latest_event_at"] or "", reverse=True)
+
+        return Response({
+            "count": len(history),
+            "results": history
+        })
 
     @action(detail=False, methods=["get"])
     def transmutation_table(self, request):

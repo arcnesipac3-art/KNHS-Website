@@ -16,6 +16,7 @@ export default function ApprovalCenter() {
   const [selectedQuarter, setSelectedQuarter] = useState('')
   const [approvalQueue, setApprovalQueue] = useState([])
   const [expandedItems, setExpandedItems] = useState(new Set())
+  const [selectedItems, setSelectedItems] = useState(new Set())
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState(null)
@@ -27,6 +28,17 @@ export default function ApprovalCenter() {
 
   const [showLockModal, setShowLockModal] = useState(false)
   const [lockTarget, setLockTarget] = useState(null)
+  
+  const [showCommentsModal, setShowCommentsModal] = useState(false)
+  const [commentsTarget, setCommentsTarget] = useState(null)
+  const [comments, setComments] = useState([])
+  const [newComment, setNewComment] = useState('')
+  const [commentIsInternal, setCommentIsInternal] = useState(false)
+  
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [historyTarget, setHistoryTarget] = useState(null)
+  const [history, setHistory] = useState([])
+  const [activeTab, setActiveTab] = useState('pending') // 'pending' or 'history'
 
   const isPrincipal = user?.role === 'principal' || user?.role === 'admin'
 
@@ -76,6 +88,7 @@ export default function ApprovalCenter() {
       try {
         const { data } = await gradeApi.getApprovalQueue({ quarter: selectedQuarter })
         setApprovalQueue(data)
+        setSelectedItems(new Set()) // Clear selections when queue changes
       } catch (err) {
         console.error('Failed to load approval queue:', err)
         setError('Failed to load pending approvals. Please try again.')
@@ -97,6 +110,142 @@ export default function ApprovalCenter() {
       }
       return newSet
     })
+  }
+  
+  function toggleSelectItem(key) {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(key)) {
+        newSet.delete(key)
+      } else {
+        newSet.add(key)
+      }
+      return newSet
+    })
+  }
+  
+  function selectAll() {
+    const allKeys = approvalQueue.map(item => `${item.class_subject_id}:${item.quarter_id}`)
+    setSelectedItems(new Set(allKeys))
+  }
+  
+  function deselectAll() {
+    setSelectedItems(new Set())
+  }
+
+  function deselectAll() {
+    setSelectedItems(new Set())
+  }
+  
+  async function handleBulkApprove() {
+    if (selectedItems.size === 0) {
+      alert('Please select at least one grade set to approve')
+      return
+    }
+    
+    if (!window.confirm(`Approve ${selectedItems.size} selected grade set(s)?`)) {
+      return
+    }
+
+    setProcessing(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const items = Array.from(selectedItems).map(key => {
+        const [class_subject_id, quarter_id] = key.split(':')
+        return { class_subject_id, quarter_id }
+      })
+      
+      const { data } = await gradeApi.bulkApprove({
+        items,
+        reason: 'Bulk approval by principal'
+      })
+
+      setSuccessMessage(`Successfully approved ${data.total_published} grades across ${selectedItems.size} grade sets. Students can now view their grades.`)
+      
+      // Reload queue
+      const queueRes = await gradeApi.getApprovalQueue({ quarter: selectedQuarter })
+      setApprovalQueue(queueRes.data)
+      setSelectedItems(new Set())
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err) {
+      console.error('Failed to bulk approve grades:', err)
+      setError(err.response?.data?.error || 'Failed to bulk approve grades. Please try again.')
+    } finally {
+      setProcessing(false)
+    }
+  }
+  
+  async function handleBulkReject() {
+    if (selectedItems.size === 0) {
+      alert('Please select at least one grade set to reject')
+      return
+    }
+    
+    setRejectTarget({ isBulk: true, count: selectedItems.size })
+    setRejectReason('')
+    setShowRejectModal(true)
+  }
+  
+  async function openCommentsModal(item) {
+    setCommentsTarget(item)
+    setComments([])
+    setNewComment('')
+    setShowCommentsModal(true)
+    
+    // Load existing comments
+    try {
+      const { data } = await gradeApi.getReviewComments({
+        class_subject: item.class_subject_id,
+        quarter: item.quarter_id
+      })
+      setComments(data)
+    } catch (err) {
+      console.error('Failed to load comments:', err)
+    }
+  }
+  
+  async function handleAddComment() {
+    if (!newComment.trim() || newComment.trim().length < 10) {
+      alert('Please enter a comment with at least 10 characters')
+      return
+    }
+    
+    try {
+      const { data } = await gradeApi.addReviewComment({
+        class_subject_id: commentsTarget.class_subject_id,
+        quarter_id: commentsTarget.quarter_id,
+        comment: newComment.trim(),
+        is_internal: commentIsInternal
+      })
+      
+      setComments(prev => [data, ...prev])
+      setNewComment('')
+      setCommentIsInternal(false)
+    } catch (err) {
+      console.error('Failed to add comment:', err)
+      alert('Failed to add comment. Please try again.')
+    }
+  }
+  
+  async function openHistoryModal(item) {
+    setHistoryTarget(item)
+    setHistory([])
+    setShowHistoryModal(true)
+    
+    // Load approval history
+    try {
+      const { data } = await gradeApi.getApprovalHistory({
+        class_subject: item.class_subject_id,
+        quarter: item.quarter_id,
+        limit: 20
+      })
+      setHistory(data.results.length > 0 ? data.results[0].events : [])
+    } catch (err) {
+      console.error('Failed to load history:', err)
+    }
   }
 
   async function handleApprove(item) {
@@ -190,13 +339,30 @@ export default function ApprovalCenter() {
     setSuccessMessage(null)
 
     try {
-      await gradeApi.reject({
-        class_subject_id: rejectTarget.class_subject_id,
-        quarter_id: rejectTarget.quarter_id,
-        reason: rejectReason.trim()
-      })
+      if (rejectTarget.isBulk) {
+        // Bulk reject
+        const items = Array.from(selectedItems).map(key => {
+          const [class_subject_id, quarter_id] = key.split(':')
+          return { class_subject_id, quarter_id }
+        })
+        
+        const { data } = await gradeApi.bulkReject({
+          items,
+          reason: rejectReason.trim()
+        })
 
-      setSuccessMessage(`Grades for ${rejectTarget.subject_name} have been returned to ${rejectTarget.teacher_name} for revision.`)
+        setSuccessMessage(`Rejected ${data.total_rejected} grades across ${selectedItems.size} grade sets for revision.`)
+        setSelectedItems(new Set())
+      } else {
+        // Single reject
+        await gradeApi.reject({
+          class_subject_id: rejectTarget.class_subject_id,
+          quarter_id: rejectTarget.quarter_id,
+          reason: rejectReason.trim()
+        })
+
+        setSuccessMessage(`Grades for ${rejectTarget.subject_name} have been returned to ${rejectTarget.teacher_name} for revision.`)
+      }
       
       // Reload queue
       const { data } = await gradeApi.getApprovalQueue({ quarter: selectedQuarter })
@@ -286,12 +452,58 @@ export default function ApprovalCenter() {
             </div>
 
             {selectedQuarterData && approvalQueue.length > 0 && (
-              <div className="text-right">
-                <p className="text-sm text-muted">Pending Approvals</p>
-                <p className="text-3xl font-bold text-amber-600">{approvalQueue.length}</p>
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <p className="text-sm text-muted">Selected</p>
+                  <p className="text-2xl font-bold text-knhs-purple">{selectedItems.size}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted">Pending</p>
+                  <p className="text-3xl font-bold text-amber-600">{approvalQueue.length}</p>
+                </div>
               </div>
             )}
           </div>
+          
+          {/* Bulk Actions Bar */}
+          {approvalQueue.length > 0 && (
+            <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={selectedItems.size === approvalQueue.length ? deselectAll : selectAll}
+                >
+                  {selectedItems.size === approvalQueue.length ? '☐ Deselect All' : '☑ Select All'}
+                </Button>
+                {selectedItems.size > 0 && (
+                  <span className="text-sm text-muted">
+                    {selectedItems.size} selected
+                  </span>
+                )}
+              </div>
+              
+              {selectedItems.size > 0 && (
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={handleBulkApprove}
+                    disabled={processing}
+                    size="sm"
+                  >
+                    ✅ Approve Selected ({selectedItems.size})
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleBulkReject}
+                    disabled={processing}
+                    size="sm"
+                  >
+                    ❌ Reject Selected ({selectedItems.size})
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Approval Queue */}
@@ -322,27 +534,36 @@ export default function ApprovalCenter() {
               {approvalQueue.map((item, index) => {
                 const key = `${item.class_subject_id}:${item.quarter_id}`
                 const isExpanded = expandedItems.has(key)
+                const isSelected = selectedItems.has(key)
 
                 return (
-                  <div key={key} className="rounded-lg border-2 border-amber-200 bg-white p-4">
+                  <div key={key} className={`rounded-lg border-2 ${isSelected ? 'border-knhs-purple' : 'border-amber-200'} bg-white p-4`}>
                     {/* Header */}
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-lg font-semibold text-text">{item.subject_name}</h3>
-                          <GradeStatusBadge status="pending_approval" />
+                      <div className="flex items-start gap-3 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectItem(key)}
+                          className="mt-1 h-5 w-5 rounded border-gray-300 text-knhs-purple focus:ring-knhs-purple"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-semibold text-text">{item.subject_name}</h3>
+                            <GradeStatusBadge status="pending_approval" />
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
+                            <span>📚 {item.classroom_name}</span>
+                            <span>👨‍🏫 {item.teacher_name}</span>
+                            <span>👥 {item.student_count} student{item.student_count !== 1 ? 's' : ''}</span>
+                            <span>📅 {item.quarter_name}</span>
+                          </div>
+                          {item.latest_submitted_at && (
+                            <p className="mt-1 text-xs text-muted">
+                              Submitted: {new Date(item.latest_submitted_at).toLocaleString()}
+                            </p>
+                          )}
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
-                          <span>📚 {item.classroom_name}</span>
-                          <span>👨‍🏫 {item.teacher_name}</span>
-                          <span>👥 {item.student_count} student{item.student_count !== 1 ? 's' : ''}</span>
-                          <span>📅 {item.quarter_name}</span>
-                        </div>
-                        {item.latest_submitted_at && (
-                          <p className="mt-1 text-xs text-muted">
-                            Submitted: {new Date(item.latest_submitted_at).toLocaleString()}
-                          </p>
-                        )}
                       </div>
                       <button
                         onClick={() => toggleExpand(key)}
@@ -416,10 +637,11 @@ export default function ApprovalCenter() {
                     )}
 
                     {/* Actions */}
-                    <div className="mt-4 flex items-center gap-3 border-t border-gray-200 pt-4">
+                    <div className="mt-4 flex items-center flex-wrap gap-3 border-t border-gray-200 pt-4">
                       <Button
                         onClick={() => handleApprove(item)}
                         disabled={processing}
+                        size="sm"
                       >
                         ✅ Approve & Publish
                       </Button>
@@ -427,15 +649,33 @@ export default function ApprovalCenter() {
                         variant="secondary"
                         onClick={() => openRejectModal(item)}
                         disabled={processing}
+                        size="sm"
                       >
                         ❌ Reject for Revision
                       </Button>
                       <Button
                         variant="secondary"
+                        onClick={() => openCommentsModal(item)}
+                        disabled={processing}
+                        size="sm"
+                      >
+                        💬 Comments
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => openHistoryModal(item)}
+                        disabled={processing}
+                        size="sm"
+                      >
+                        📜 History
+                      </Button>
+                      <Button
+                        variant="secondary"
                         onClick={() => openLockModal(item)}
                         disabled={processing}
+                        size="sm"
                       >
-                        🔒 Lock Grades
+                        🔒 Lock
                       </Button>
                       {!isExpanded && (
                         <button
@@ -458,9 +698,14 @@ export default function ApprovalCenter() {
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="text-xl font-bold text-text">Reject Grades for Revision</h3>
+            <h3 className="text-xl font-bold text-text">
+              {rejectTarget?.isBulk ? `Reject ${rejectTarget.count} Grade Sets` : 'Reject Grades for Revision'}
+            </h3>
             <p className="mt-2 text-sm text-muted">
-              Please provide a detailed reason why these grades need revision. This will be sent to {rejectTarget?.teacher_name}.
+              {rejectTarget?.isBulk 
+                ? `Provide a reason for rejecting the ${rejectTarget.count} selected grade sets. This will be sent to the respective teachers.`
+                : `Please provide a detailed reason why these grades need revision. This will be sent to ${rejectTarget?.teacher_name}.`
+              }
             </p>
 
             <div className="mt-4">
@@ -552,6 +797,160 @@ export default function ApprovalCenter() {
               <Button onClick={handleLock} disabled={processing}>
                 {processing ? 'Locking...' : '🔒 Lock Grades'}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comments Modal */}
+      {showCommentsModal && commentsTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-text">Review Comments</h3>
+                <p className="text-sm text-muted">
+                  {commentsTarget.subject_name} - {commentsTarget.classroom_name}
+                </p>
+              </div>
+              <button onClick={() => setShowCommentsModal(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Add Comment Form */}
+            <div className="mb-6 border-b border-gray-200 pb-6">
+              <label className="block text-sm font-medium text-text mb-2">Add Comment</label>
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                rows={3}
+                placeholder="Enter your review comment or feedback..."
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  <input
+                    type="checkbox"
+                    checked={commentIsInternal}
+                    onChange={(e) => setCommentIsInternal(e.target.checked)}
+                    className="rounded border-gray-300 text-knhs-purple focus:ring-knhs-purple"
+                  />
+                  Internal note (visible only to principals/admins)
+                </label>
+                <Button size="sm" onClick={handleAddComment} disabled={newComment.trim().length < 10}>
+                  Add Comment
+                </Button>
+              </div>
+            </div>
+
+            {/* Comments List */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-text">Comments ({comments.length})</h4>
+              {comments.length === 0 ? (
+                <p className="text-center text-sm text-muted py-8">No comments yet</p>
+              ) : (
+                comments.map((comment) => (
+                  <div key={comment.id} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-text">{comment.author_name}</span>
+                          <span className="text-xs text-muted">({comment.author_role})</span>
+                          {comment.is_internal && (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                              Internal
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm text-text">{comment.comment}</p>
+                      </div>
+                      <span className="text-xs text-muted">
+                        {new Date(comment.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && historyTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-text">Approval History</h3>
+                <p className="text-sm text-muted">
+                  {historyTarget.subject_name} - {historyTarget.classroom_name}
+                </p>
+              </div>
+              <button onClick={() => setShowHistoryModal(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* History Timeline */}
+            <div className="space-y-4">
+              {history.length === 0 ? (
+                <p className="text-center text-sm text-muted py-8">No history available</p>
+              ) : (
+                history.map((event, index) => (
+                  <div key={event.id} className="relative pl-8">
+                    {/* Timeline dot */}
+                    {index < history.length - 1 && (
+                      <div className="absolute left-2 top-8 bottom-0 w-0.5 bg-gray-200"></div>
+                    )}
+                    <div className={`absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 ${
+                      event.action === 'approved' || event.action === 'published' 
+                        ? 'border-green-500 bg-green-100'
+                        : event.action === 'edited' && event.metadata?.result === 'rejected'
+                        ? 'border-red-500 bg-red-100'
+                        : 'border-blue-500 bg-blue-100'
+                    }`}></div>
+
+                    <div className="rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              event.action === 'approved' || event.action === 'published'
+                                ? 'bg-green-100 text-green-800'
+                                : event.action === 'edited' && event.metadata?.result === 'rejected'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {event.action_display}
+                            </span>
+                            {event.metadata?.bulk_operation && (
+                              <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                                Bulk Operation
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-2 text-sm text-text">
+                            <span className="font-medium">{event.actor_name}</span>
+                            {event.actor_role && <span className="text-muted"> ({event.actor_role})</span>}
+                          </p>
+                          {event.reason && (
+                            <p className="mt-2 text-sm text-muted italic">"{event.reason}"</p>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted whitespace-nowrap">
+                          {new Date(event.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

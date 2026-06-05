@@ -173,6 +173,36 @@ export const gradeApi = {
   getApprovalQueue: (filters = {}) => api.get('/grades/approval_queue/', { params: filters }),
 
   /**
+   * Bulk approve multiple grade sets (principal/admin)
+   * @param {Object} data - { items: [{class_subject_id, quarter_id}], reason? }
+   */
+  bulkApprove: (data) => api.post('/grades/bulk_approve/', data),
+
+  /**
+   * Bulk reject multiple grade sets (principal/admin)
+   * @param {Object} data - { items: [{class_subject_id, quarter_id}], reason }
+   */
+  bulkReject: (data) => api.post('/grades/bulk_reject/', data),
+
+  /**
+   * Add review comment to a grade set
+   * @param {Object} data - { class_subject_id, quarter_id, comment, is_internal? }
+   */
+  addReviewComment: (data) => api.post('/grades/add_review_comment/', data),
+
+  /**
+   * Get review comments for a grade set
+   * @param {Object} params - { class_subject, quarter }
+   */
+  getReviewComments: (params) => api.get('/grades/review_comments/', { params }),
+
+  /**
+   * Get approval history for grade sets
+   * @param {Object} params - { class_subject?, quarter?, limit? }
+   */
+  getApprovalHistory: (params = {}) => api.get('/grades/approval_history/', { params }),
+
+  /**
    * Generate SF9 JSON data for a student
    * @param {Object} params - { student, academic_year }
    */

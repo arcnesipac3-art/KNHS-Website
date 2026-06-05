@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Grade, GradePublishEvent
+from .models import Grade, GradePublishEvent, GradeReviewComment, ConductRating
 
 
 @admin.register(Grade)
@@ -65,3 +65,41 @@ class GradePublishEventAdmin(admin.ModelAdmin):
     search_fields = ["grade__class_enrollment__student__email", "actor__email", "reason"]
     readonly_fields = ["grade", "action", "actor", "reason", "metadata", "created_at"]
     ordering = ["-created_at"]
+
+
+@admin.register(GradeReviewComment)
+class GradeReviewCommentAdmin(admin.ModelAdmin):
+    list_display = ["get_subject_name", "quarter", "author", "is_internal", "created_at"]
+    list_filter = ["is_internal", "created_at", "quarter__academic_year"]
+    search_fields = ["class_subject__subject__name", "author__email", "comment"]
+    readonly_fields = ["author", "created_at"]
+    ordering = ["-created_at"]
+    
+    fieldsets = (
+        ("Grade Set", {
+            "fields": ("class_subject", "quarter")
+        }),
+        ("Comment", {
+            "fields": ("author", "comment", "is_internal")
+        }),
+        ("Metadata", {
+            "fields": ("created_at",),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def get_subject_name(self, obj):
+        return f"{obj.class_subject.subject.name} - {obj.class_subject.classroom.name}"
+    get_subject_name.short_description = "Subject & Class"
+
+
+@admin.register(ConductRating)
+class ConductRatingAdmin(admin.ModelAdmin):
+    list_display = ["get_student_name", "quarter", "core_value", "behavior", "rating"]
+    list_filter = ["rating", "core_value", "quarter__academic_year", "quarter"]
+    search_fields = ["class_enrollment__student__email", "behavior"]
+    ordering = ["quarter", "class_enrollment__classroom", "class_enrollment__student"]
+    
+    def get_student_name(self, obj):
+        return obj.class_enrollment.student.display_name
+    get_student_name.short_description = "Student"
