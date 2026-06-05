@@ -75,7 +75,7 @@ export default function CreateUser() {
       // Add role-specific fields
       if (formData.role === 'student') {
         data.lrn = formData.lrn
-        data.grade_level = parseInt(formData.grade_level)
+        data.grade_level = formData.grade_level ? parseInt(formData.grade_level) : null
         if (formData.strand) data.strand = formData.strand
       } else if (formData.role === 'teacher') {
         data.employee_id = formData.employee_id
@@ -96,12 +96,21 @@ export default function CreateUser() {
       console.error('Failed to create user:', err)
       if (err.response?.data) {
         const errors = err.response.data
-        const errorMessages = Object.entries(errors)
-          .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-          .join('\n')
-        setError(errorMessages || 'Failed to create user. Please check the form.')
+        // Handle both field errors and non-field errors
+        const errorMessages = []
+        
+        Object.entries(errors).forEach(([field, messages]) => {
+          if (field === 'non_field_errors') {
+            errorMessages.push(Array.isArray(messages) ? messages.join(', ') : messages)
+          } else {
+            const fieldLabel = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+            errorMessages.push(`${fieldLabel}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+          }
+        })
+        
+        setError(errorMessages.join('\n') || 'Failed to create user. Please check the form.')
       } else {
-        setError('Failed to create user. Please try again.')
+        setError('Failed to create user. Please check your connection and try again.')
       }
       setLoading(false)
     }

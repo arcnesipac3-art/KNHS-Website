@@ -167,8 +167,11 @@ class CreateUserSerializer(serializers.Serializer):
         if role == User.Role.STUDENT:
             if not data.get('lrn'):
                 raise serializers.ValidationError({"lrn": "LRN is required for students."})
-            if not data.get('grade_level'):
+            if data.get('grade_level') is None:
                 raise serializers.ValidationError({"grade_level": "Grade level is required for students."})
+            # Validate grade level range
+            if data.get('grade_level') and not (7 <= data.get('grade_level') <= 12):
+                raise serializers.ValidationError({"grade_level": "Grade level must be between 7 and 12."})
         
         if role == User.Role.TEACHER and not data.get('employee_id'):
             raise serializers.ValidationError({"employee_id": "Employee ID is required for teachers."})
