@@ -12,6 +12,7 @@ from apps.academics.models import ClassEnrollment, ClassSubject, Quarter
 from apps.academics.permissions import IsAdminOrPrincipal, IsAdminUser, IsTeacherUser
 from apps.communications.models import Notification
 from .models import Grade, GradePublishEvent, ConductRating
+from .pagination import GradePagination
 from .reports import SF9Generator
 from .serializers import (
     GradeSerializer,
@@ -57,6 +58,7 @@ class GradeViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = GradeSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = GradePagination
 
     def get_queryset(self):
         queryset = super().get_queryset()
