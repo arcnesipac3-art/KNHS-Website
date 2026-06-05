@@ -28,7 +28,7 @@ export default function ForcePasswordChange() {
     setSubmitting(true)
     try {
       await api.post('/auth/change-password/', {
-        current_password: currentPassword,
+        old_password: currentPassword,
         new_password: newPassword,
       })
       await refreshUser()
