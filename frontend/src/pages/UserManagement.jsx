@@ -5,6 +5,26 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { userApi } from '../lib/userApi'
 
+// Helper: extract a human-readable error string from any DRF error shape
+function extractError(err) {
+  const data = err.response?.data
+  if (!data) return err.message || 'An error occurred'
+  // Shape: { code, message, details }
+  if (data.message) return data.message
+  // Shape: { error: "string" }
+  if (typeof data.error === 'string') return data.error
+  // Shape: { field: ["msg", ...], ... } — DRF validation errors
+  if (typeof data === 'object') {
+    const messages = []
+    for (const [field, errors] of Object.entries(data)) {
+      if (Array.isArray(errors)) messages.push(`${field}: ${errors.join(', ')}`)
+      else if (typeof errors === 'string') messages.push(`${field}: ${errors}`)
+    }
+    if (messages.length > 0) return messages.join(' | ')
+  }
+  return 'An error occurred'
+}
+
 export default function UserManagement() {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
@@ -68,23 +88,18 @@ export default function UserManagement() {
     if (!confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
       return
     }
-
     try {
       await userApi.delete(userId)
       setSuccessMessage(`User ${userName} deleted successfully`)
       loadUsers()
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to delete user')
+      setError(extractError(err))
     }
   }
 
-
   async function handleActivateDeactivate(userId, isActive, userName) {
     const action = isActive ? 'deactivate' : 'activate'
-    if (!confirm(`Are you sure you want to ${action} ${userName}?`)) {
-      return
-    }
-
+    if (!confirm(`Are you sure you want to ${action} ${userName}?`)) return
     try {
       if (isActive) {
         await userApi.deactivate(userId)
@@ -94,15 +109,12 @@ export default function UserManagement() {
       setSuccessMessage(`User ${userName} ${action}d successfully`)
       loadUsers()
     } catch (err) {
-      setError(err.response?.data?.error || `Failed to ${action} user`)
+      setError(extractError(err))
     }
   }
 
   async function handleResetPassword(userId, userName) {
-    if (!confirm(`Reset password for ${userName}? They will be forced to change it on next login.`)) {
-      return
-    }
-
+    if (!confirm(`Reset password for ${userName}? They will be forced to change it on next login.`)) return
     try {
       const { data } = await userApi.resetPassword(userId)
       setTempPassword(data.temporary_password)
@@ -110,7 +122,7 @@ export default function UserManagement() {
       setSuccessMessage(`Password reset for ${userName}`)
       loadUsers()
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to reset password')
+      setError(extractError(err))
     }
   }
 
@@ -368,11 +380,11 @@ export default function UserManagement() {
 function CreateUserModal({ onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
     role: 'student',
     first_name: '',
     last_name: '',
     lrn: '',
-    employee_id: '',
     grade_level: '',
     contact_number: '',
   })
@@ -385,10 +397,23 @@ function CreateUserModal({ onClose, onSuccess }) {
     setError(null)
 
     try {
-      await userApi.create(formData)
+      // Build clean payload — only send fields the backend expects
+      const payload = {
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone: formData.contact_number || '',
+      }
+      if (formData.role === 'student') {
+        payload.lrn = formData.lrn || ''
+        payload.grade_level = formData.grade_level ? parseInt(formData.grade_level) : null
+      }
+      await userApi.create(payload)
       onSuccess()
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create user')
+      setError(extractError(err))
       setSaving(false)
     }
   }
@@ -413,6 +438,21 @@ function CreateUserModal({ onClose, onSuccess }) {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                minLength={8}
+                placeholder="Min. 8 characters"
                 className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2"
               />
             </div>
@@ -556,7 +596,7 @@ function EditUserModal({ user, onClose, onSuccess }) {
       await userApi.update(user.id, formData)
       onSuccess()
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to update user')
+      setError(extractError(err))
       setSaving(false)
     }
   }
