@@ -174,20 +174,29 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
             "student", "student__profile"
         )
 
+        # Single aggregated query instead of N+1 (one query per student)
+        from django.db.models import Count, Case, When, IntegerField as IntF
+        records_qs = AttendanceRecord.objects.filter(
+            class_enrollment__classroom=classroom,
+            class_enrollment__status="active",
+            date__gte=date_from,
+            date__lte=date_to,
+        ).values('class_enrollment_id').annotate(
+            present=Count(Case(When(status='P', then=1), output_field=IntF())),
+            absent=Count(Case(When(status='A', then=1), output_field=IntF())),
+            late=Count(Case(When(status='L', then=1), output_field=IntF())),
+            excused=Count(Case(When(status='E', then=1), output_field=IntF())),
+        )
+        records_map = {r['class_enrollment_id']: r for r in records_qs}
+
         summary_data = []
         for enrollment in enrollments:
-            records = AttendanceRecord.objects.filter(
-                class_enrollment=enrollment,
-                date__gte=date_from,
-                date__lte=date_to,
-            )
-
-            present = records.filter(status="P").count()
-            absent = records.filter(status="A").count()
-            late = records.filter(status="L").count()
-            excused = records.filter(status="E").count()
+            r = records_map.get(enrollment.id, {})
+            present = r.get('present', 0)
+            absent = r.get('absent', 0)
+            late = r.get('late', 0)
+            excused = r.get('excused', 0)
             total = present + absent + late + excused
-
             attendance_rate = (present / total * 100) if total > 0 else 0
 
             summary_data.append(

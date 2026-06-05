@@ -11,10 +11,6 @@ python manage.py collectstatic --no-input
 # Run migrations
 python manage.py migrate
 
-# Ensure the database-backed Django cache exists for DRF throttling and
-# RateLimitMiddleware. Safe to run on every Render build.
-python manage.py createcachetable
-
 # Seed admin user (only creates if doesn't exist)
 python manage.py seed_admin
 

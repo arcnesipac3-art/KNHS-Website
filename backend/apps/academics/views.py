@@ -22,7 +22,7 @@ from .permissions import IsAdminUser, IsTeacherUser, IsStudentUser
 class AcademicYearViewSet(viewsets.ModelViewSet):
     """Academic year management (admin only)."""
 
-    queryset = AcademicYear.objects.all()
+    queryset = AcademicYear.objects.prefetch_related('quarters').all()
     serializer_class = AcademicYearSerializer
     permission_classes = [IsAuthenticated]
 
@@ -53,7 +53,7 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
 class QuarterViewSet(viewsets.ModelViewSet):
     """Quarter management."""
 
-    queryset = Quarter.objects.all()
+    queryset = Quarter.objects.select_related('academic_year').all()
     serializer_class = QuarterSerializer
     permission_classes = [IsAuthenticated]
 
@@ -105,7 +105,9 @@ class SubjectViewSet(viewsets.ModelViewSet):
 class ClassroomViewSet(viewsets.ModelViewSet):
     """Classroom management."""
 
-    queryset = Classroom.objects.select_related("adviser", "academic_year").all()
+    queryset = Classroom.objects.select_related(
+        "adviser", "adviser__profile", "academic_year"
+    ).prefetch_related('class_subjects', 'class_subjects__subject', 'class_subjects__teacher').all()
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):

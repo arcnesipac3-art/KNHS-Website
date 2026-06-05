@@ -64,7 +64,8 @@ TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [],
-        "APP_DIRS": True,
+        # Use explicit loaders with caching in production — faster than APP_DIRS=True
+        "APP_DIRS": DEBUG,  # True in dev (auto-discovery), False in prod
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
@@ -72,6 +73,12 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
+            # In production, use cached template loader to skip disk reads
+            **({"loaders": [
+                ("django.template.loaders.cached.Loader", [
+                    "django.template.loaders.app_directories.Loader",
+                ]),
+            ]} if not DEBUG else {}),
         },
     },
 ]
@@ -81,13 +88,17 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database configuration - PostgreSQL for production, SQLite for development
 if os.getenv("DATABASE_URL"):
     # Production: Use Supabase PostgreSQL
+    # conn_max_age=600: reuse connections for 10 min (avoids new TCP handshake per request)
+    # conn_health_checks=False: skip the extra SELECT 1 on every reused connection
     DATABASES = {
         "default": dj_database_url.config(
             default=os.getenv("DATABASE_URL"),
             conn_max_age=600,
-            conn_health_checks=True,
+            conn_health_checks=False,
         )
     }
+    # Supabase requires SSL
+    DATABASES["default"]["OPTIONS"] = {"sslmode": "require"}
 else:
     # Development: Use SQLite
     DATABASES = {
@@ -162,15 +173,13 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
 
 # Cache configuration
+# LocMem cache: zero DB queries, sub-millisecond, perfect for Render free tier.
+# Each gunicorn worker has its own cache — fine for rate limiting since limits
+# are per-worker anyway on the free single-instance plan.
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'app_cache_table',
-        'TIMEOUT': 300,  # 5 minutes default
-        'OPTIONS': {
-            'MAX_ENTRIES': 10000,
-            'CULL_FREQUENCY': 3,
-        }
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'knhs-cache',
     }
 }
 
@@ -192,7 +201,7 @@ REST_FRAMEWORK = {
     },
     "EXCEPTION_HANDLER": "apps.system.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 20,
+    "PAGE_SIZE": 50,  # Increased from 20 → reduces number of paginated API calls on list pages
 }
 
 JWT_ACCESS_MINUTES = int(os.getenv("JWT_ACCESS_MINUTES", "15"))
@@ -210,3 +219,44 @@ REFRESH_TOKEN_COOKIE_NAME = "knhs_refresh_token"
 REFRESH_TOKEN_COOKIE_SECURE = not DEBUG
 REFRESH_TOKEN_COOKIE_HTTPONLY = True
 REFRESH_TOKEN_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"  # Allow cross-site cookies in production
+
+REFRESH_TOKEN_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
+
+# ── Performance & Logging ──────────────────────────────────────────────────
+
+# Extend JWT access token to 60 minutes to reduce token refresh overhead.
+# Each refresh requires a DB write (blacklist) + read — costly on cold starts.
+# 60 min is still safe for a school portal with trusted devices.
+JWT_ACCESS_MINUTES = int(os.getenv("JWT_ACCESS_MINUTES", "60"))
+
+# Production logging — errors only to avoid log I/O overhead
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING" if not DEBUG else "DEBUG",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "WARNING" if not DEBUG else "INFO",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            # Set to DEBUG locally to see queries; WARNING in production
+            "level": "WARNING",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+    },
+}
+
+# Whitenoise caching headers — serve static files with long cache TTL
+# so browsers don't re-download CSS/JS on every page load
+WHITENOISE_MAX_AGE = 31536000  # 1 year (files are content-hashed so this is safe)

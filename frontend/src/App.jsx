@@ -7,19 +7,17 @@ import PublicLayout from './components/layout/PublicLayout'
 import DebugPanel from './components/ui/DebugPanel'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import LoadingSpinner from './components/ui/LoadingSpinner'
-import api from './lib/api'
 
-// Keep the Render free-tier backend alive by pinging it every 9 minutes.
-// Render sleeps after 15 min of inactivity; this prevents that cold-start delay.
+// Keep the Render free-tier backend alive — ping /api/health/ (no DB, no auth, <5ms)
+// every 9 minutes so the server never hits the 15-min inactivity sleep threshold.
+const HEALTH_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000') + '/api/health/'
+
 function useKeepAlive() {
   useEffect(() => {
-    // Ping immediately on load so the server warms up right away
-    api.get('/auth/me/').catch(() => {})
-
+    fetch(HEALTH_URL, { method: 'GET', mode: 'cors' }).catch(() => {})
     const interval = setInterval(() => {
-      api.get('/auth/me/').catch(() => {}) // silent — we don't care about the response
-    }, 9 * 60 * 1000) // every 9 minutes
-
+      fetch(HEALTH_URL, { method: 'GET', mode: 'cors' }).catch(() => {})
+    }, 9 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 }
