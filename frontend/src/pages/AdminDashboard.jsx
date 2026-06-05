@@ -10,33 +10,45 @@ import api from '../lib/api'
 export default function AdminDashboard() {
   const { user } = useAuth()
   const [academicYear, setAcademicYear] = useState(null)
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState({ total_students: 0, total_teachers: 0, total_classrooms: 0, pending_enrollments: 0 })
   const [loading, setLoading] = useState(true)
+  const [slowWarning, setSlowWarning] = useState(false)
 
   useEffect(() => {
+    const warnTimer = setTimeout(() => setSlowWarning(true), 8000)
+
     async function loadDashboard() {
-      try {
-        const [yearData, dashboardData] = await Promise.all([
-          getCurrentAcademicYearWithQuarters(),
-          api.get('/dashboard/'),
-        ])
-        console.log('📊 Dashboard data loaded:', { yearData, dashboardData: dashboardData.data })
-        setAcademicYear(yearData)
-        // Map the new flat dashboard response to the KPI keys the UI expects
-        const d = dashboardData.data
+      const [yearResult, dashboardResult] = await Promise.allSettled([
+        getCurrentAcademicYearWithQuarters(),
+        api.get('/dashboard/'),
+      ])
+
+      if (yearResult.status === 'fulfilled') {
+        setAcademicYear(yearResult.value)
+      } else {
+        console.error('Failed to load academic year:', yearResult.reason)
+        setAcademicYear({ academicYear: null, quarters: [] })
+      }
+
+      if (dashboardResult.status === 'fulfilled') {
+        const d = dashboardResult.value.data
         setStats({
           total_students: d?.users?.active_students ?? 0,
           total_teachers: d?.users?.active_teachers ?? 0,
           total_classrooms: 0,
           pending_enrollments: d?.grades?.pending_approvals ?? 0,
         })
-      } catch (error) {
-        console.error('Failed to load dashboard:', error)
-      } finally {
-        setLoading(false)
+      } else {
+        console.error('Failed to load dashboard:', dashboardResult.reason)
       }
+
+      clearTimeout(warnTimer)
+      setSlowWarning(false)
+      setLoading(false)
     }
+
     loadDashboard()
+    return () => clearTimeout(warnTimer)
   }, [])
 
   if (loading) {
@@ -46,6 +58,9 @@ export default function AdminDashboard() {
           <div className="text-center">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-purple-200 border-t-knhs-purple"></div>
             <p className="mt-4 text-muted">Loading dashboard...</p>
+            {slowWarning && (
+              <p className="mt-2 text-sm text-amber-600">Server is waking up, this may take a moment...</p>
+            )}
           </div>
         </div>
       </PortalLayout>

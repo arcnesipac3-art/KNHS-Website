@@ -12,23 +12,41 @@ export default function TeacherDashboard() {
   const [dashboard, setDashboard] = useState(null)
   const [academicYear, setAcademicYear] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [slowWarning, setSlowWarning] = useState(false)
 
   useEffect(() => {
+    // Show a friendly warning if the server is slow to wake up
+    const warnTimer = setTimeout(() => setSlowWarning(true), 8000)
+
     async function loadDashboard() {
-      try {
-        const [dashboardData, yearData] = await Promise.all([
-          getTeacherDashboard(),
-          getCurrentAcademicYearWithQuarters(),
-        ])
-        setDashboard(dashboardData)
-        setAcademicYear(yearData)
-      } catch (error) {
-        console.error('Failed to load dashboard:', error)
-      } finally {
-        setLoading(false)
+      // Load independently so a single failure doesn't break everything
+      const [dashboardResult, yearResult] = await Promise.allSettled([
+        getTeacherDashboard(),
+        getCurrentAcademicYearWithQuarters(),
+      ])
+
+      if (dashboardResult.status === 'fulfilled') {
+        setDashboard(dashboardResult.value)
+      } else {
+        console.error('Error fetching teacher dashboard:', dashboardResult.reason)
+        // Set empty defaults so the UI still renders
+        setDashboard({ myAssignments: [], ungradedSubmissions: [], draftGrades: [], stats: { totalAssignments: 0, ungradedCount: 0, draftGradesCount: 0 } })
       }
+
+      if (yearResult.status === 'fulfilled') {
+        setAcademicYear(yearResult.value)
+      } else {
+        console.error('Failed to load dashboard:', yearResult.reason)
+        setAcademicYear({ academicYear: null, quarters: [] })
+      }
+
+      clearTimeout(warnTimer)
+      setSlowWarning(false)
+      setLoading(false)
     }
+
     loadDashboard()
+    return () => clearTimeout(warnTimer)
   }, [])
 
   if (loading) {
@@ -38,6 +56,11 @@ export default function TeacherDashboard() {
           <div className="text-center">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-purple-200 border-t-knhs-purple"></div>
             <p className="mt-4 text-muted">Loading dashboard...</p>
+            {slowWarning && (
+              <p className="mt-2 text-sm text-amber-600">
+                Server is waking up, this may take a moment...
+              </p>
+            )}
           </div>
         </div>
       </PortalLayout>
