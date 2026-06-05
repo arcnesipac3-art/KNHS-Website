@@ -252,3 +252,48 @@ class SchoolEventSerializer(serializers.ModelSerializer):
             })
         
         return data
+
+
+# ── Schedule Serializers ──────────────────────────────────────────────────────
+
+from .models import Period, TimetableSlot  # noqa: E402 — appended after initial imports
+
+
+class PeriodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Period
+        fields = (
+            'id', 'academic_year', 'name', 'start_time', 'end_time',
+            'order', 'is_break', 'created_at',
+        )
+        read_only_fields = ('id', 'created_at')
+
+
+class TimetableSlotSerializer(serializers.ModelSerializer):
+    # Nested read-only detail fields
+    subject_name = serializers.CharField(source='class_subject.subject.name', read_only=True)
+    teacher_name = serializers.SerializerMethodField()
+    period_name = serializers.CharField(source='period.name', read_only=True)
+    period_start_time = serializers.TimeField(source='period.start_time', read_only=True)
+    period_end_time = serializers.TimeField(source='period.end_time', read_only=True)
+    period_order = serializers.IntegerField(source='period.order', read_only=True)
+    classroom_name = serializers.CharField(source='classroom.name', read_only=True)
+    day_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimetableSlot
+        fields = (
+            'id', 'classroom', 'classroom_name',
+            'class_subject', 'subject_name', 'teacher_name',
+            'period', 'period_name', 'period_start_time', 'period_end_time', 'period_order',
+            'day_of_week', 'day_name', 'room',
+            'created_at', 'updated_at',
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_teacher_name(self, obj):
+        teacher = obj.class_subject.teacher
+        return teacher.display_name if teacher else 'Unassigned'
+
+    def get_day_name(self, obj):
+        return dict(TimetableSlot.DAY_CHOICES).get(obj.day_of_week, '')

@@ -380,3 +380,78 @@ class SchoolEventViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set created_by to current user."""
         serializer.save(created_by=self.request.user)
+
+
+# ── Schedule Views ────────────────────────────────────────────────────────────
+
+from .models import Period, TimetableSlot  # noqa: E402
+from .serializers import PeriodSerializer, TimetableSlotSerializer  # noqa: E402
+
+
+class PeriodViewSet(viewsets.ModelViewSet):
+    """School day periods/time slots (admin only for CUD)."""
+
+    queryset = Period.objects.select_related('academic_year').all()
+    serializer_class = PeriodSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        academic_year_id = self.request.query_params.get('academic_year')
+        if academic_year_id:
+            queryset = queryset.filter(academic_year_id=academic_year_id)
+        else:
+            # Default to current academic year
+            queryset = queryset.filter(academic_year__is_current=True)
+        return queryset
+
+
+class TimetableSlotViewSet(viewsets.ModelViewSet):
+    """Timetable slot management (admin only for CUD)."""
+
+    queryset = TimetableSlot.objects.select_related(
+        'classroom',
+        'class_subject',
+        'class_subject__subject',
+        'class_subject__teacher',
+        'period',
+    ).all()
+    serializer_class = TimetableSlotSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+
+        # Filter by classroom
+        classroom_id = self.request.query_params.get('classroom')
+        if classroom_id:
+            queryset = queryset.filter(classroom_id=classroom_id)
+
+        # Filter by day
+        day = self.request.query_params.get('day')
+        if day:
+            queryset = queryset.filter(day_of_week=day)
+
+        # Role-based: students see their enrolled class's timetable
+        if user.role == 'student':
+            enrolled_classrooms = user.class_enrollments.filter(
+                status='active'
+            ).values_list('classroom_id', flat=True)
+            queryset = queryset.filter(classroom_id__in=enrolled_classrooms)
+
+        # Teachers see their teaching assignments
+        elif user.role == 'teacher':
+            queryset = queryset.filter(class_subject__teacher=user)
+
+        return queryset

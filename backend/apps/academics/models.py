@@ -344,3 +344,63 @@ class SchoolEvent(models.Model):
         if not self.end_date:
             return 1
         return (self.end_date - self.start_date).days + 1
+
+
+class Period(models.Model):
+    """A named time slot in the school day (e.g., Period 1, 7:00–8:00 AM)."""
+
+    DAY_CHOICES = [
+        (1, 'Monday'),
+        (2, 'Tuesday'),
+        (3, 'Wednesday'),
+        (4, 'Thursday'),
+        (5, 'Friday'),
+        (6, 'Saturday'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    academic_year = models.ForeignKey(
+        AcademicYear, on_delete=models.CASCADE, related_name='periods'
+    )
+    name = models.CharField(max_length=50, help_text="e.g., Period 1, Homeroom, Break")
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    order = models.PositiveSmallIntegerField(default=1, help_text="Display order within the day")
+    is_break = models.BooleanField(default=False, help_text="True for recess/lunch breaks")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['academic_year', 'order', 'start_time']
+        unique_together = [['academic_year', 'order']]
+
+    def __str__(self):
+        return f"{self.name} ({self.start_time.strftime('%H:%M')}–{self.end_time.strftime('%H:%M')})"
+
+
+class TimetableSlot(models.Model):
+    """A scheduled class: which subject is taught in which classroom on which day/period."""
+
+    DAY_CHOICES = Period.DAY_CHOICES
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    classroom = models.ForeignKey(
+        Classroom, on_delete=models.CASCADE, related_name='timetable_slots'
+    )
+    class_subject = models.ForeignKey(
+        ClassSubject, on_delete=models.CASCADE, related_name='timetable_slots'
+    )
+    period = models.ForeignKey(
+        Period, on_delete=models.CASCADE, related_name='slots'
+    )
+    day_of_week = models.PositiveSmallIntegerField(choices=DAY_CHOICES)
+    room = models.CharField(max_length=50, blank=True, help_text="Room/lab name or number")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['classroom', 'day_of_week', 'period__order']
+        unique_together = [['classroom', 'period', 'day_of_week']]
+
+    def __str__(self):
+        day = dict(self.DAY_CHOICES).get(self.day_of_week, '?')
+        return f"{self.classroom} | {day} {self.period.name} | {self.class_subject.subject.name}"
