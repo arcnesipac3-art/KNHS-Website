@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import api from '../lib/api'
 
 export default function NotificationSettings() {
+  const { user } = useAuth()
   const [settings, setSettings] = useState({
     // Email Notifications
     email_assignments: true,
@@ -23,6 +26,22 @@ export default function NotificationSettings() {
 
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
+
+  useEffect(() => {
+    loadPreferences()
+  }, [])
+
+  async function loadPreferences() {
+    try {
+      const response = await api.get('/communications/notification-preferences/')
+      setSettings(response.data)
+    } catch (error) {
+      console.error('Failed to load notification preferences:', error)
+    } finally {
+      setInitialLoading(false)
+    }
+  }
 
   function handleToggle(key) {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }))
@@ -30,12 +49,16 @@ export default function NotificationSettings() {
 
   async function handleSave() {
     setLoading(true)
-    // TODO: Save to backend when API is ready
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await api.put('/communications/notification-preferences/', settings)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
-    }, 500)
+    } catch (error) {
+      console.error('Failed to save notification preferences:', error)
+      alert('Failed to save preferences. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -46,6 +69,12 @@ export default function NotificationSettings() {
           <h1 className="text-3xl font-bold text-text">Notification Settings</h1>
           <p className="mt-2 text-muted">Manage how you receive notifications</p>
         </div>
+
+        {initialLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-knhs-purple border-t-transparent"></div>
+          </div>
+        )}
 
         {/* Success Message */}
         {success && (

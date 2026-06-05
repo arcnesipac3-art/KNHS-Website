@@ -6,13 +6,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.academics.permissions import IsAdminUser
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences
 from .serializers import (
     AnnouncementSerializer,
     AnnouncementAttachmentSerializer,
     AnnouncementReadSerializer,
     NotificationSerializer,
     PublishAnnouncementSerializer,
+    NotificationPreferencesSerializer,
 )
 
 
@@ -223,3 +224,31 @@ class NotificationViewSet(viewsets.ModelViewSet):
         """Get count of unread notifications."""
         count = Notification.objects.filter(user=request.user, is_read=False).count()
         return Response({"unread_count": count})
+
+
+class NotificationPreferencesViewSet(viewsets.ModelViewSet):
+    """User notification preferences management."""
+
+    serializer_class = NotificationPreferencesSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Users can only access their own preferences
+        return NotificationPreferences.objects.filter(user=self.request.user)
+
+    def get_object(self):
+        # Get or create preferences for current user
+        obj, created = NotificationPreferences.objects.get_or_create(
+            user=self.request.user
+        )
+        return obj
+
+    def perform_create(self, serializer):
+        # Associate with current user
+        serializer.save(user=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        # Return single user's preferences instead of list
+        obj = self.get_object()
+        serializer = self.get_serializer(obj)
+        return Response(serializer.data)

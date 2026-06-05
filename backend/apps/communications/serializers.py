@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences
 
 
 class AnnouncementAttachmentSerializer(serializers.ModelSerializer):
@@ -114,3 +114,23 @@ class PublishAnnouncementSerializer(serializers.Serializer):
             raise serializers.ValidationError("scheduled_time must be in the future")
         
         return data
+
+
+class NotificationPreferencesSerializer(serializers.ModelSerializer):
+    """Serializer for user notification preferences."""
+
+    class Meta:
+        model = NotificationPreferences
+        fields = [
+            'email_assignments',
+            'email_grades',
+            'email_announcements',
+            'email_attendance',
+            'email_materials',
+            'inapp_assignments',
+            'inapp_grades',
+            'inapp_announcements',
+            'inapp_attendance',
+            'inapp_materials',
+            'inapp_submissions',
+        ]

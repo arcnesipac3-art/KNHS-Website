@@ -147,3 +147,38 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.title} for {self.user.display_name}"
+
+
+class NotificationPreferences(models.Model):
+    """User notification preferences for email and in-app notifications."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notification_preferences'
+    )
+
+    # Email notification preferences
+    email_assignments = models.BooleanField(default=True)
+    email_grades = models.BooleanField(default=True)
+    email_announcements = models.BooleanField(default=True)
+    email_attendance = models.BooleanField(default=False)
+    email_materials = models.BooleanField(default=False)
+
+    # In-app notification preferences
+    inapp_assignments = models.BooleanField(default=True)
+    inapp_grades = models.BooleanField(default=True)
+    inapp_announcements = models.BooleanField(default=True)
+    inapp_attendance = models.BooleanField(default=True)
+    inapp_materials = models.BooleanField(default=True)
+    inapp_submissions = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Notification Preferences'
+        verbose_name_plural = 'Notification Preferences'
+
+    def __str__(self):
+        return f'Preferences for {self.user.email}'
