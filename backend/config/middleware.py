@@ -11,10 +11,12 @@ class RateLimitMiddleware:
     """
     Rate limiting middleware for API endpoints.
     
-    Limits:
+    Updated Limits (more generous for authenticated users):
     - Authentication endpoints: 5 requests per minute
-    - Grade mutations (lock/unlock): 10 requests per minute
-    - General API: 100 requests per minute
+    - Public enrollment: 10 requests per hour
+    - Grade mutations (lock/unlock): 20 requests per minute
+    - Grade publication: 50 requests per minute
+    - General API: 1000 requests per minute (allows parallel requests from dashboards)
     """
     
     def __init__(self, get_response):
@@ -34,23 +36,27 @@ class RateLimitMiddleware:
 
     @staticmethod
     def _rate_for_path(path, method):
+        # Authentication endpoints - strict limits
         if path in {'/api/v1/auth/login/', '/api/v1/auth/register/'}:
-            return 'auth', 5, 60
+            return 'auth', 5, 60  # 5 per minute
 
+        # Public enrollment endpoints - moderate limits
         if path.startswith('/api/v1/enrollment-applications/'):
             is_create = method == 'POST' and path == '/api/v1/enrollment-applications/'
             is_track = path == '/api/v1/enrollment-applications/track/'
             if is_create or is_track:
-                return 'public-enrollment', 10, 3600
+                return 'public-enrollment', 10, 3600  # 10 per hour
 
+        # Grade locking/unlocking - moderate limits
         if path.startswith('/api/v1/grades/'):
             if path.endswith('/lock/') or path.endswith('/unlock/'):
-                return 'grade-locking', 10, 60
+                return 'grade-locking', 20, 60  # 20 per minute
             if path.endswith('/publish/') or path.endswith('/reject/'):
-                return 'grade-publication', 20, 60
+                return 'grade-publication', 50, 60  # 50 per minute
 
+        # General API endpoints - VERY generous limits for authenticated users
         if path.startswith('/api/'):
-            return 'api', 100, 60
+            return 'api', 1000, 60  # 1000 per minute (allows dashboard loads with many parallel requests)
 
         return None
 
