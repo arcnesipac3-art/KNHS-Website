@@ -50,7 +50,7 @@ export default function UserManagement() {
       if (filters.is_active) params.append('is_active', filters.is_active)
       if (filters.search) params.append('search', filters.search)
 
-      const response = await api.get(`/api/v1/users/?${params.toString()}`)
+      const response = await api.get(`/users/?${params.toString()}`)
       setUsers(response.data)
 
       // Calculate stats
@@ -79,7 +79,7 @@ export default function UserManagement() {
     }
 
     try {
-      await api.post(`/api/v1/users/${userId}/deactivate/`)
+      await api.post(`/users/${userId}/deactivate/`)
       loadUsers()
     } catch (err) {
       console.error('Failed to deactivate user:', err)
@@ -89,7 +89,7 @@ export default function UserManagement() {
 
   const handleActivate = async (userId) => {
     try {
-      await api.post(`/api/v1/users/${userId}/activate/`)
+      await api.post(`/users/${userId}/activate/`)
       loadUsers()
     } catch (err) {
       console.error('Failed to activate user:', err)

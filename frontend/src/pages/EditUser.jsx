@@ -45,7 +45,7 @@ export default function EditUser() {
   const loadUser = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/api/v1/users/${id}/`)
+      const response = await api.get(`/users/${id}/`)
       setUser(response.data)
       
       // Populate form
@@ -108,7 +108,7 @@ export default function EditUser() {
         data.employee_id = formData.employee_id
       }
 
-      await api.patch(`/api/v1/users/${id}/`, data)
+      await api.patch(`/users/${id}/`, data)
       navigate('/users')
     } catch (err) {
       console.error('Failed to update user:', err)
@@ -132,7 +132,7 @@ export default function EditUser() {
     }
 
     try {
-      const response = await api.post(`/api/v1/users/${id}/reset_password/`)
+      const response = await api.post(`/users/${id}/reset_password/`)
       alert(`Password reset successfully!\n\nTemporary Password: ${response.data.temporary_password}\n\nUser must change this password on next login.`)
     } catch (err) {
       console.error('Failed to reset password:', err)

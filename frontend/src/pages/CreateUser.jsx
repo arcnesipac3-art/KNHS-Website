@@ -83,7 +83,7 @@ export default function CreateUser() {
 
       if (formData.phone) data.phone = formData.phone
 
-      const response = await api.post('/api/v1/users/', data)
+      const response = await api.post('/users/', data)
       
       // Show temporary password before navigating
       setTempPassword(formData.password)
