@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='assignment',
-            index=models.Index(fields=['assignment_type', 'created_at'], name='assign_type_created_idx'),
+            index=models.Index(fields=['status', 'created_at'], name='assign_status_created_idx'),
         ),
         
         # Add indexes for submissions
