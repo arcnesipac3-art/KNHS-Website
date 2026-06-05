@@ -8,7 +8,12 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
-from .serializers import ChangePasswordSerializer, LoginSerializer, UserSerializer
+from .serializers import (
+    ChangePasswordSerializer,
+    LoginSerializer,
+    UpdateProfileSerializer,
+    UserSerializer,
+)
 
 
 def _set_refresh_cookie(response, refresh_token):
@@ -149,9 +154,9 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
 
         user = request.user
-        if not user.check_password(serializer.validated_data["current_password"]):
+        if not user.check_password(serializer.validated_data["old_password"]):
             return Response(
-                {"error": {"code": "invalid_password", "message": "Current password is incorrect."}},
+                {"error": "Current password is incorrect.", "old_password": ["Current password is incorrect."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -160,3 +165,24 @@ class ChangePasswordView(APIView):
         user.save(update_fields=["password", "must_change_password", "updated_at"])
 
         return Response({"detail": "Password updated successfully."})
+
+
+class UpdateProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        serializer = UpdateProfileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        profile = user.profile
+
+        # Update profile fields
+        for field, value in serializer.validated_data.items():
+            setattr(profile, field, value)
+        
+        profile.save()
+
+        # Return updated user data
+        return Response(_user_payload(user), status=status.HTTP_200_OK)
+
