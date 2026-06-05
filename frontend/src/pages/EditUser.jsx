@@ -26,7 +26,6 @@ export default function EditUser() {
     lrn: '',
     grade_level: '',
     strand: '',
-    employee_id: '',
     phone: '',
   })
 
@@ -64,7 +63,6 @@ export default function EditUser() {
         lrn: response.data.profile?.lrn || '',
         grade_level: response.data.profile?.grade_level || '',
         strand: response.data.profile?.strand || '',
-        employee_id: response.data.profile?.employee_id || '',
         phone: response.data.profile?.phone || '',
       })
       
@@ -90,10 +88,6 @@ export default function EditUser() {
         nextState.lrn = ''
         nextState.grade_level = ''
         nextState.strand = ''
-      }
-
-      if (name === 'role' && value !== 'teacher') {
-        nextState.employee_id = ''
       }
 
       if (name === 'grade_level' && parseInt(value || '0', 10) < 11) {
@@ -127,8 +121,6 @@ export default function EditUser() {
         data.lrn = formData.lrn
         data.grade_level = parseInt(formData.grade_level) || null
         data.strand = formData.strand
-      } else if (formData.role === 'teacher') {
-        data.employee_id = formData.employee_id
       }
 
       await api.patch(`/users/${id}/`, data)
@@ -427,16 +419,18 @@ export default function EditUser() {
             {/* Teacher-specific fields */}
             {isTeacher && (
               <Card title="Teacher Information" subtitle="Employment details">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-text">Employee ID</label>
-                  <input
-                    type="text"
-                    name="employee_id"
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
-                    value={formData.employee_id}
-                    onChange={handleChange}
-                    placeholder="e.g., TCH-2026-001"
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-text">Employee ID</label>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-text">
+                      {user?.profile?.employee_id || 'Will be generated automatically when you save'}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm text-blue-800">
+                      Employee ID is generated automatically for teacher accounts.
+                    </p>
+                  </div>
                 </div>
               </Card>
             )}

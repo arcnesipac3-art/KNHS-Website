@@ -22,7 +22,6 @@ export default function CreateUser() {
     lrn: '',
     grade_level: '',
     strand: '',
-    employee_id: '',
     phone: '',
     must_change_password: true,
     is_approved: true,
@@ -53,10 +52,6 @@ export default function CreateUser() {
         nextState.lrn = ''
         nextState.grade_level = ''
         nextState.strand = ''
-      }
-
-      if (name === 'role' && value !== 'teacher') {
-        nextState.employee_id = ''
       }
 
       if (name === 'grade_level' && parseInt(value || '0', 10) < 11) {
@@ -111,13 +106,6 @@ export default function CreateUser() {
         data.lrn = formData.lrn.trim()
         data.grade_level = formData.grade_level ? parseInt(formData.grade_level) : null
         if (formData.strand) data.strand = formData.strand
-      } else if (formData.role === 'teacher') {
-        if (!formData.employee_id) {
-          setError('Employee ID is required for teachers')
-          setLoading(false)
-          return
-        }
-        data.employee_id = formData.employee_id.trim()
       }
 
       if (formData.phone) data.phone = formData.phone.trim()
@@ -206,7 +194,6 @@ export default function CreateUser() {
                   lrn: '',
                   grade_level: '',
                   strand: '',
-                  employee_id: '',
                   phone: '',
                   must_change_password: true,
                   is_approved: true,
@@ -457,19 +444,10 @@ export default function CreateUser() {
             {/* Teacher-specific fields */}
             {isTeacher && (
               <Card title="Teacher Information" subtitle="Employment details">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-text">
-                    Employee ID <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="employee_id"
-                    required={isTeacher}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
-                    value={formData.employee_id}
-                    onChange={handleChange}
-                    placeholder="e.g., TCH-2026-001"
-                  />
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <p className="text-sm text-blue-800">
+                    Employee ID is generated automatically when the teacher account is created.
+                  </p>
                 </div>
               </Card>
             )}

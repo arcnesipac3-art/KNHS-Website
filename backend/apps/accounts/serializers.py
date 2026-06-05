@@ -1,6 +1,24 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import User, UserProfile
+
+
+def generate_employee_id():
+    """Generate the next teacher employee ID in TCH-YYYY-### format."""
+    year = timezone.now().year
+    prefix = f"TCH-{year}-"
+    existing_ids = UserProfile.objects.filter(
+        employee_id__startswith=prefix
+    ).values_list("employee_id", flat=True)
+
+    highest_sequence = 0
+    for employee_id in existing_ids:
+        suffix = employee_id.removeprefix(prefix)
+        if suffix.isdigit():
+            highest_sequence = max(highest_sequence, int(suffix))
+
+    return f"{prefix}{highest_sequence + 1:03d}"
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -213,7 +231,6 @@ class CreateUserSerializer(serializers.Serializer):
         role = data.get('role')
         grade_level = data.get('grade_level')
         strand = data.get('strand', '')
-        employee_id = data.get('employee_id', '')
         
         # Validate role-specific required fields
         if role == User.Role.STUDENT:
@@ -231,10 +248,10 @@ class CreateUserSerializer(serializers.Serializer):
             data['grade_level'] = None
             data['strand'] = ''
 
-        if role == User.Role.TEACHER and not employee_id:
-            raise serializers.ValidationError({"employee_id": "Employee ID is required for teachers."})
-        if role != User.Role.TEACHER:
-            data['employee_id'] = employee_id or ''
+        if role == User.Role.TEACHER:
+            data['employee_id'] = generate_employee_id()
+        else:
+            data['employee_id'] = ''
         
         return data
 
@@ -330,7 +347,6 @@ class UpdateUserSerializer(serializers.Serializer):
         role = data.get('role', user.role)
         grade_level = data.get('grade_level', user.profile.grade_level)
         strand = data.get('strand', user.profile.strand)
-        employee_id = data.get('employee_id', user.profile.employee_id)
 
         if role == User.Role.STUDENT:
             lrn = data.get('lrn', user.profile.lrn)
@@ -347,10 +363,10 @@ class UpdateUserSerializer(serializers.Serializer):
             data['grade_level'] = None
             data['strand'] = ''
 
-        if role == User.Role.TEACHER and not employee_id:
-            raise serializers.ValidationError({"employee_id": "Employee ID is required for teachers."})
-        if role != User.Role.TEACHER:
-            data['employee_id'] = self._clean_optional_text(employee_id) or ''
+        if role == User.Role.TEACHER:
+            data['employee_id'] = user.profile.employee_id or generate_employee_id()
+        else:
+            data['employee_id'] = ''
 
         return data
 
