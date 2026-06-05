@@ -76,7 +76,25 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         assignment.status = "published"
         assignment.save()
 
-        # TODO: Create notifications for students
+        # Notify students in the class
+        from apps.communications.models import Notification
+        students = assignment.class_subject.classroom.enrollments.filter(
+            status="active"
+        ).select_related("student")
+        
+        notifications = []
+        for enrollment in students:
+            notifications.append(
+                Notification(
+                    user=enrollment.student,
+                    notification_type="assignment",
+                    title="New Assignment Published",
+                    body=f"New assignment: {assignment.title} in {assignment.class_subject.subject.name}",
+                    link=f"/assignments/{assignment.id}",
+                )
+            )
+        if notifications:
+            Notification.objects.bulk_create(notifications)
 
         return Response({"message": "Assignment published successfully"})
 
@@ -182,7 +200,17 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
         submission.submit()
 
-        # TODO: Create notification for teacher
+        # Notify teacher about new submission
+        from apps.communications.models import Notification
+        teacher = submission.assignment.class_subject.teacher
+        if teacher:
+            Notification.objects.create(
+                user=teacher,
+                notification_type="submission",
+                title="New Assignment Submission",
+                body=f"{submission.student.display_name} submitted: {submission.assignment.title}",
+                link=f"/submissions/{submission.id}",
+            )
 
         return Response(
             {
@@ -214,7 +242,15 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         submission.graded_by = request.user
         submission.save()
 
-        # TODO: Create notification for student
+        # Notify student that their submission was graded
+        from apps.communications.models import Notification
+        Notification.objects.create(
+            user=submission.student,
+            notification_type="submission",
+            title="Assignment Graded",
+            body=f"Your submission for '{submission.assignment.title}' has been graded. Score: {submission.score}/{submission.assignment.max_score}",
+            link=f"/assignments/{submission.assignment.id}",
+        )
 
         return Response(
             {

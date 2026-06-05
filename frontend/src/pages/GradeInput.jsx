@@ -23,6 +23,7 @@ export default function GradeInput() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
+  const [transmutationTable, setTransmutationTable] = useState([])
 
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin'
 
@@ -32,6 +33,22 @@ export default function GradeInput() {
       navigate('/dashboard')
     }
   }, [user, isTeacher, navigate])
+
+  // Load transmutation table on mount
+  useEffect(() => {
+    async function loadTransmutationTable() {
+      try {
+        const { data } = await gradeApi.getTransmutationTable()
+        setTransmutationTable(data.table)
+      } catch (err) {
+        console.error('Failed to load transmutation table:', err)
+        // Fallback to empty array - transmuteGrade will handle it
+      }
+    }
+    if (isTeacher) {
+      loadTransmutationTable()
+    }
+  }, [isTeacher])
 
   // Load initial data
   useEffect(() => {
@@ -173,34 +190,48 @@ export default function GradeInput() {
   }
 
   function transmuteGrade(initialGrade) {
-    // DepEd Transmutation Table
-    if (initialGrade >= 100.00) return 100
-    if (initialGrade >= 98.40) return 99
-    if (initialGrade >= 96.80) return 98
-    if (initialGrade >= 95.20) return 97
-    if (initialGrade >= 93.60) return 96
-    if (initialGrade >= 92.00) return 95
-    if (initialGrade >= 90.40) return 94
-    if (initialGrade >= 88.80) return 93
-    if (initialGrade >= 87.20) return 92
-    if (initialGrade >= 85.60) return 91
-    if (initialGrade >= 84.00) return 90
-    if (initialGrade >= 82.40) return 89
-    if (initialGrade >= 80.80) return 88
-    if (initialGrade >= 79.20) return 87
-    if (initialGrade >= 77.60) return 86
-    if (initialGrade >= 76.00) return 85
-    if (initialGrade >= 74.40) return 84
-    if (initialGrade >= 72.80) return 83
-    if (initialGrade >= 71.20) return 82
-    if (initialGrade >= 69.60) return 81
-    if (initialGrade >= 68.00) return 80
-    if (initialGrade >= 66.40) return 79
-    if (initialGrade >= 64.80) return 78
-    if (initialGrade >= 63.20) return 77
-    if (initialGrade >= 61.60) return 76
-    if (initialGrade >= 60.00) return 75
-    return 60 // Below 60.00
+    // Use API-provided transmutation table
+    if (!transmutationTable || transmutationTable.length === 0) {
+      // Fallback to hardcoded table if API fails
+      if (initialGrade >= 100.00) return 100
+      if (initialGrade >= 98.40) return 99
+      if (initialGrade >= 96.80) return 98
+      if (initialGrade >= 95.20) return 97
+      if (initialGrade >= 93.60) return 96
+      if (initialGrade >= 92.00) return 95
+      if (initialGrade >= 90.40) return 94
+      if (initialGrade >= 88.80) return 93
+      if (initialGrade >= 87.20) return 92
+      if (initialGrade >= 85.60) return 91
+      if (initialGrade >= 84.00) return 90
+      if (initialGrade >= 82.40) return 89
+      if (initialGrade >= 80.80) return 88
+      if (initialGrade >= 79.20) return 87
+      if (initialGrade >= 77.60) return 86
+      if (initialGrade >= 76.00) return 85
+      if (initialGrade >= 74.40) return 84
+      if (initialGrade >= 72.80) return 83
+      if (initialGrade >= 71.20) return 82
+      if (initialGrade >= 69.60) return 81
+      if (initialGrade >= 68.00) return 80
+      if (initialGrade >= 66.40) return 79
+      if (initialGrade >= 64.80) return 78
+      if (initialGrade >= 63.20) return 77
+      if (initialGrade >= 61.60) return 76
+      if (initialGrade >= 60.00) return 75
+      return 60
+    }
+
+    // Find the appropriate transmuted grade from the table
+    // Table is sorted descending by initial_grade
+    for (const entry of transmutationTable) {
+      if (initialGrade >= entry.initial_grade) {
+        return entry.transmuted_grade
+      }
+    }
+    
+    // Below minimum grade
+    return 60
   }
 
   async function handleSave() {
@@ -285,7 +316,7 @@ export default function GradeInput() {
     }
   }
 
-  async function handlePublish() {
+  async function handleSubmitForApproval() {
     if (!selectedSubject || !selectedQuarter) {
       return
     }
@@ -297,11 +328,11 @@ export default function GradeInput() {
     })
 
     if (studentsWithoutGrades.length > 0) {
-      setError(`${studentsWithoutGrades.length} student(s) do not have complete grades. Please fill all grades before publishing.`)
+      setError(`${studentsWithoutGrades.length} student(s) do not have complete grades. Please fill all grades before submitting.`)
       return
     }
 
-    if (!window.confirm('Are you sure you want to publish these grades? Students will be able to see them.')) {
+    if (!window.confirm('Are you sure you want to submit these grades for principal approval? You will not be able to edit them until they are reviewed.')) {
       return
     }
 
@@ -310,12 +341,13 @@ export default function GradeInput() {
     setSuccessMessage(null)
 
     try {
-      await gradeApi.publish({
+      await gradeApi.submitForApproval({
         class_subject_id: selectedSubject,
         quarter_id: selectedQuarter,
+        reason: 'Submitting grades for principal review and approval'
       })
 
-      setSuccessMessage('Grades published successfully! Students can now view their grades.')
+      setSuccessMessage('Grades submitted successfully! The principal will review and approve them before students can view them.')
       
       // Reload to update status
       const { data: gradesData } = await gradeApi.getAll({
@@ -338,8 +370,8 @@ export default function GradeInput() {
 
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
-      console.error('Failed to publish grades:', err)
-      setError(err.response?.data?.error || 'Failed to publish grades. Please try again.')
+      console.error('Failed to submit grades:', err)
+      setError(err.response?.data?.error || 'Failed to submit grades. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -354,7 +386,9 @@ export default function GradeInput() {
     return grade && grade.ww && grade.pt && grade.qa
   })
 
+  const isPendingApproval = Object.values(grades).some((g) => g.status === 'pending_approval')
   const isPublished = Object.values(grades).some((g) => g.status === 'published')
+  const isLocked = Object.values(grades).some((g) => g.status === 'locked')
 
   return (
     <PortalLayout>
@@ -482,7 +516,9 @@ export default function GradeInput() {
                   </h3>
                   <p className="text-sm text-purple-200">
                     {selectedQuarterData.name} • {enrollments.length} students
-                    {isPublished && <span className="ml-2 rounded bg-white bg-opacity-20 px-2 py-0.5 text-xs font-semibold">Published</span>}
+                    {isPendingApproval && <span className="ml-2 rounded bg-amber-500 bg-opacity-90 px-2 py-0.5 text-xs font-semibold">Pending Approval</span>}
+                    {isPublished && !isLocked && <span className="ml-2 rounded bg-green-500 bg-opacity-90 px-2 py-0.5 text-xs font-semibold">Published</span>}
+                    {isLocked && <span className="ml-2 rounded bg-purple-900 bg-opacity-60 px-2 py-0.5 text-xs font-semibold">🔒 Locked</span>}
                   </p>
                 </div>
               </div>
@@ -527,7 +563,7 @@ export default function GradeInput() {
                     <tbody className="divide-y divide-gray-100">
                       {enrollments.map((enrollment, index) => {
                         const grade = grades[enrollment.id] || {}
-                        const isDisabled = grade.status === 'published'
+                        const isDisabled = grade.status === 'pending_approval' || grade.status === 'published' || grade.status === 'locked'
 
                         return (
                           <tr key={enrollment.id} className="hover:bg-gray-50">
@@ -612,11 +648,11 @@ export default function GradeInput() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Button variant="secondary" onClick={handleSave} disabled={saving || isPublished}>
+                      <Button variant="secondary" onClick={handleSave} disabled={saving || isPendingApproval || isPublished || isLocked}>
                         {saving ? 'Saving...' : 'Save Draft'}
                       </Button>
-                      <Button onClick={handlePublish} disabled={saving || !allGradesComplete || isPublished}>
-                        {isPublished ? 'Published' : 'Publish Grades'}
+                      <Button onClick={handleSubmitForApproval} disabled={saving || !allGradesComplete || isPendingApproval || isPublished || isLocked}>
+                        {isPendingApproval ? 'Pending Approval' : isPublished ? 'Published' : isLocked ? 'Locked' : 'Submit for Approval'}
                       </Button>
                     </div>
                   </div>

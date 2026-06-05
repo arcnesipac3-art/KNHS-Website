@@ -132,17 +132,63 @@ export const gradeApi = {
   batchInput: (data) => api.post('/grades/batch_input/', data),
 
   /**
+   * Submit grades for principal/admin approval (teacher/admin)
+   * @param {Object} data - { class_subject_id, quarter_id, reason? }
+   */
+  submitForApproval: (data) => api.post('/grades/submit_for_approval/', data),
+
+  /**
    * Publish grades for class-subject-quarter (teacher/admin)
-   * @param {Object} data - { class_subject_id, quarter_id }
+   * @param {Object} data - { class_subject_id, quarter_id, reason? }
    */
   publish: (data) => api.post('/grades/publish/', data),
 
   /**
+   * Reject submitted grades for revision (principal/admin)
+   * @param {Object} data - { class_subject_id, quarter_id, reason }
+   */
+  reject: (data) => api.post('/grades/reject/', data),
+
+  /**
+   * Lock published grades after release (principal/admin)
+   * @param {Object} data - { class_subject_id, quarter_id }
+   */
+  lock: (data) => api.post('/grades/lock/', data),
+
+  /**
    * Unlock published grade (admin only)
    * @param {string} id - Grade ID
-   * @param {string} reason - Reason for unlock
+   * @param {Object} data - { reason }
    */
-  unlock: (id, reason) => api.post(`/grades/${id}/unlock/`, { reason }),
+  unlock: (id, data) => api.post(`/grades/${id}/unlock/`, data),
+
+  /**
+   * Get DepEd transmutation table
+   */
+  getTransmutationTable: () => api.get('/grades/transmutation_table/'),
+
+  /**
+   * Get grouped approval queue for principals/admins
+   */
+  getApprovalQueue: (filters = {}) => api.get('/grades/approval_queue/', { params: filters }),
+}
+
+// ============================================================================
+// CONDUCT RATINGS
+// ============================================================================
+
+export const conductRatingApi = {
+  /**
+   * Get all conduct ratings with optional filters
+   * @param {Object} filters - { quarter, student, classroom }
+   */
+  getAll: (filters = {}) => api.get('/conduct-ratings/', { params: filters }),
+
+  /**
+   * Batch conduct rating input (teacher/admin)
+   * @param {Object} data - { classroom_id, quarter_id, ratings: [...] }
+   */
+  batchInput: (data) => api.post('/conduct-ratings/batch_input/', data),
 }
 
 // ============================================================================

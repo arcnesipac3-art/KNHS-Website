@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Grade, GradePublishEvent
+from .models import Grade, GradePublishEvent, ConductRating
 
 
 class GradeSerializer(serializers.ModelSerializer):
@@ -86,6 +86,49 @@ class PublishGradesSerializer(serializers.Serializer):
     quarter_id = serializers.UUIDField()
 
 
+class GradeWorkflowActionSerializer(serializers.Serializer):
+    """Serializer for quarter-wide grade workflow actions."""
+
+    class_subject_id = serializers.UUIDField()
+    quarter_id = serializers.UUIDField()
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+
 class UnlockGradeSerializer(serializers.Serializer):
     """Serializer for unlocking a published grade."""
     reason = serializers.CharField(required=True, min_length=10)
+
+
+class ConductRatingSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source="class_enrollment.student.display_name", read_only=True)
+    student_lrn = serializers.CharField(source="class_enrollment.student.profile.lrn", read_only=True)
+    quarter_name = serializers.CharField(source="quarter.name", read_only=True)
+    core_value_display = serializers.CharField(source="get_core_value_display", read_only=True)
+    rating_display = serializers.CharField(source="get_rating_display", read_only=True)
+
+    class Meta:
+        model = ConductRating
+        fields = [
+            "id",
+            "class_enrollment",
+            "student_name",
+            "student_lrn",
+            "quarter",
+            "quarter_name",
+            "core_value",
+            "core_value_display",
+            "behavior",
+            "rating",
+            "rating_display",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ConductRatingInputSerializer(serializers.Serializer):
+    """Serializer for batch conduct rating input."""
+    student_id = serializers.UUIDField()
+    core_value = serializers.ChoiceField(choices=ConductRating.CORE_VALUE_CHOICES)
+    behavior = serializers.CharField(max_length=255)
+    rating = serializers.ChoiceField(choices=ConductRating.RATING_CHOICES)

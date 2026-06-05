@@ -40,6 +40,10 @@ import EnrollmentManagement from './pages/EnrollmentManagement'
 import UserManagement from './pages/UserManagement'
 import CreateUser from './pages/CreateUser'
 import EditUser from './pages/EditUser'
+import PrincipalDashboard from './pages/PrincipalDashboard'
+import ApprovalCenter from './pages/ApprovalCenter'
+import AdminUnlockGrades from './pages/AdminUnlockGrades'
+import ConductRatings from './pages/ConductRatings'
 
 const queryClient = new QueryClient()
 
@@ -68,7 +72,7 @@ function App() {
               <Route path="student-dashboard" element={<StudentDashboard />} />
               <Route path="teacher-dashboard" element={<TeacherDashboard />} />
               <Route path="admin-dashboard" element={<AdminDashboard />} />
-              <Route path="principal-dashboard" element={<PlaceholderPage title="Principal Dashboard" description="Executive dashboard and approval center coming in Phase 2." />} />
+              <Route path="principal-dashboard" element={<PrincipalDashboard />} />
               <Route path="guidance-dashboard" element={<PlaceholderPage title="Guidance Dashboard" description="Student lookup and case management coming in Phase 2." />} />
               <Route path="registrar-dashboard" element={<PlaceholderPage title="Registrar Dashboard" description="Enrollment queue and records management coming soon." />} />
               <Route path="force-password-change" element={<ForcePasswordChange />} />
@@ -91,6 +95,7 @@ function App() {
               <Route path="announcements" element={<AnnouncementList />} />
               <Route path="announcements/create" element={<CreateAnnouncement />} />
               <Route path="grades/input" element={<GradeInput />} />
+              <Route path="grades/conduct" element={<ConductRatings />} />
               <Route path="grades" element={<StudentGrades />} />
               <Route
                 path="attendance"
@@ -158,15 +163,8 @@ function App() {
                 path="settings"
                 element={<Settings />}
               />
-              <Route
-                path="approvals"
-                element={
-                  <PlaceholderPage
-                    title="Approval Center"
-                    description="Principal approval workflows planned for Phase 2."
-                  />
-                }
-              />
+              <Route path="approvals" element={<ApprovalCenter />} />
+              <Route path="admin/unlock-grades" element={<AdminUnlockGrades />} />
               <Route
                 path="reports"
                 element={

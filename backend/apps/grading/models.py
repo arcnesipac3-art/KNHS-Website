@@ -190,3 +190,45 @@ class GradePublishEvent(models.Model):
 
     def __str__(self):
         return f"{self.action} - {self.grade} by {self.actor}"
+
+
+class ConductRating(models.Model):
+    """Student conduct/core values rating per quarter."""
+
+    CORE_VALUE_CHOICES = [
+        ("maka_diyos", "Maka-Diyos"),
+        ("makatao", "Makatao"),
+        ("makakalikasan", "Makakalikasan"),
+        ("makabansa", "Makabansa"),
+    ]
+
+    RATING_CHOICES = [
+        ("AO", "Always Observed"),
+        ("SO", "Sometimes Observed"),
+        ("RO", "Rarely Observed"),
+        ("NO", "Not Observed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    class_enrollment = models.ForeignKey(
+        ClassEnrollment, on_delete=models.CASCADE, related_name="conduct_ratings"
+    )
+    quarter = models.ForeignKey(
+        Quarter, on_delete=models.CASCADE, related_name="conduct_ratings"
+    )
+    core_value = models.CharField(max_length=20, choices=CORE_VALUE_CHOICES)
+    behavior = models.CharField(
+        max_length=255, 
+        help_text="Specific behavior statement (e.g., 'Expresses one's spiritual beliefs')"
+    )
+    rating = models.CharField(max_length=2, choices=RATING_CHOICES)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["class_enrollment", "quarter", "core_value"]
+        unique_together = [["class_enrollment", "quarter", "core_value", "behavior"]]
+
+    def __str__(self):
+        return f"{self.class_enrollment.student.display_name} - {self.get_core_value_display()} Q{self.quarter.number}"

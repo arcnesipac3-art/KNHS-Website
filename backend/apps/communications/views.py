@@ -96,7 +96,52 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
         announcement.save()
 
-        # TODO: Create notifications for target audience
+        # Create notifications for target audience
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Determine target users based on audience type
+        target_users = []
+        if announcement.audience_type == "school":
+            target_users = User.objects.filter(is_active=True)
+        elif announcement.audience_type == "role":
+            role = announcement.audience_metadata.get("role")
+            if role:
+                target_users = User.objects.filter(is_active=True, role=role)
+        elif announcement.audience_type == "grade":
+            grade_level = announcement.audience_metadata.get("grade_level")
+            if grade_level:
+                # Get students in this grade level
+                from apps.academics.models import ClassEnrollment
+                enrollments = ClassEnrollment.objects.filter(
+                    classroom__grade_level=grade_level,
+                    status="active"
+                ).select_related("student")
+                target_users = [e.student for e in enrollments]
+        elif announcement.audience_type == "classroom":
+            # Get students in specific classroom
+            from apps.academics.models import ClassEnrollment
+            enrollments = ClassEnrollment.objects.filter(
+                classroom_id=announcement.audience_ref_id,
+                status="active"
+            ).select_related("student")
+            target_users = [e.student for e in enrollments]
+        
+        # Create notifications
+        from apps.communications.models import Notification
+        notifications = []
+        for user in target_users[:500]:  # Limit to 500 to avoid overwhelming database
+            notifications.append(
+                Notification(
+                    user=user,
+                    notification_type="announcement",
+                    title=f"New Announcement: {announcement.title}",
+                    body=announcement.body[:150] + ("..." if len(announcement.body) > 150 else ""),
+                    link=f"/announcements",
+                )
+            )
+        if notifications:
+            Notification.objects.bulk_create(notifications)
 
         return Response({"message": "Announcement published successfully"})
 

@@ -11,7 +11,7 @@ from .serializers import (
     EnrollmentApplicationTrackingSerializer,
     EnrollmentApplicationReviewSerializer,
 )
-from apps.academics.permissions import IsAdminOrRegistrar
+from apps.academics.permissions import IsAdminRegistrarOrPrincipal
 from apps.system.tasks import send_enrollment_status_email, log_system_event
 
 
@@ -40,7 +40,7 @@ class EnrollmentApplicationViewSet(viewsets.ModelViewSet):
         """
         if self.action in ['create', 'track']:
             return [AllowAny()]
-        return [IsAuthenticated(), IsAdminOrRegistrar()]
+        return [IsAuthenticated(), IsAdminRegistrarOrPrincipal()]
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -125,7 +125,7 @@ class EnrollmentApplicationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(application)
         return Response(serializer.data)
     
-    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminOrRegistrar])
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminRegistrarOrPrincipal])
     def review(self, request, pk=None):
         """
         Review and update application status (registrar/admin only).
@@ -175,7 +175,7 @@ class EnrollmentApplicationViewSet(viewsets.ModelViewSet):
             'message': f'Application status updated to {new_status}'
         })
     
-    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated, IsAdminOrRegistrar])
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated, IsAdminRegistrarOrPrincipal])
     def history(self, request, pk=None):
         """
         Get status change history for an application.

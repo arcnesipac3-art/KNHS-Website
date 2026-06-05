@@ -71,6 +71,9 @@ export default function TeacherDashboard() {
           <Link to="/grades/input">
             <Button variant="secondary">Input Grades</Button>
           </Link>
+          <Link to="/grades/conduct">
+            <Button variant="secondary">Conduct Ratings</Button>
+          </Link>
           <Link to="/attendance/mark">
             <Button variant="secondary">Mark Attendance</Button>
           </Link>

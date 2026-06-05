@@ -22,6 +22,13 @@ class IsStudentUser(permissions.BasePermission):
         return request.user and request.user.is_authenticated and request.user.role == "student"
 
 
+class IsPrincipalUser(permissions.BasePermission):
+    """Allow access only to principal users."""
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.role == "principal"
+
+
 class IsTeacherOfClass(permissions.BasePermission):
     """Allow access only to teachers of the specific class."""
 
@@ -72,4 +79,26 @@ class IsAdminOrRegistrar(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and request.user.role in ["admin", "registrar"]
+        )
+
+
+class IsAdminOrPrincipal(permissions.BasePermission):
+    """Allow access only to admin or principal users."""
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ["admin", "principal"]
+        )
+
+
+class IsAdminRegistrarOrPrincipal(permissions.BasePermission):
+    """Allow access only to admin, registrar, or principal users."""
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ["admin", "registrar", "principal"]
         )

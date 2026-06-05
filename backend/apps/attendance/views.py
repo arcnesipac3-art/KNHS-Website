@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.academics.models import Classroom, ClassEnrollment
+from apps.academics.models import Classroom, ClassEnrollment, Quarter
 from apps.academics.permissions import IsAdminUser, IsTeacherUser
 from .models import AttendanceRecord
 from .serializers import (
@@ -206,3 +206,56 @@ class AttendanceRecordViewSet(viewsets.ModelViewSet):
 
         serializer = AttendanceSummarySerializer(summary_data, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def quarterly_rollup(self, request):
+        """Get attendance rollup for a specific student and quarter (for SF9)."""
+        student_id = request.query_params.get("student")
+        quarter_id = request.query_params.get("quarter")
+
+        if not student_id or not quarter_id:
+            return Response(
+                {"error": "student and quarter parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            quarter = Quarter.objects.get(id=quarter_id)
+            enrollment = ClassEnrollment.objects.get(
+                student_id=student_id,
+                classroom__academic_year=quarter.academic_year,
+                status="active"
+            )
+        except (Quarter.DoesNotExist, ClassEnrollment.DoesNotExist):
+            return Response(
+                {"error": "Invalid student or quarter ID"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        records = AttendanceRecord.objects.filter(
+            class_enrollment=enrollment,
+            date__gte=quarter.start_date,
+            date__lte=quarter.end_date,
+        )
+
+        present = records.filter(status="P").count()
+        absent = records.filter(status="A").count()
+        late = records.filter(status="L").count()
+        excused = records.filter(status="E").count()
+        total = present + absent + late + excused
+
+        attendance_rate = (present / total * 100) if total > 0 else 0
+
+        data = {
+            "student_id": student_id,
+            "student_name": enrollment.student.display_name,
+            "quarter_name": quarter.name,
+            "present_count": present,
+            "absent_count": absent,
+            "late_count": late,
+            "excused_count": excused,
+            "total_days": total,
+            "attendance_rate": round(attendance_rate, 2),
+        }
+
+        return Response(data)
