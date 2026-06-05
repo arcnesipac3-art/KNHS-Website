@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('grading', '0002_grade_rejection_note_and_more'),
+        ('grading', '0002_conductrating'),
     ]
 
     operations = [
