@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='gradepublishevent',
-            index=models.Index(fields=['grade', 'event_type', 'created_at'], name='gpe_grade_type_created_idx'),
+            index=models.Index(fields=['grade', 'action', 'created_at'], name='gpe_grade_action_created_idx'),
         ),
         migrations.AddIndex(
             model_name='conductrating',
