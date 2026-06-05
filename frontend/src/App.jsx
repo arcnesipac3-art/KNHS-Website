@@ -72,6 +72,7 @@ const AttendanceHistory = lazy(() => import('./pages/AttendanceHistory'))
 const GuidanceDashboard = lazy(() => import('./pages/GuidanceDashboard'))
 const RegistrarDashboard = lazy(() => import('./pages/RegistrarDashboard'))
 const Reports = lazy(() => import('./pages/Reports'))
+const Schedule = lazy(() => import('./pages/Schedule'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,12 +140,7 @@ function App() {
               />
               <Route
                 path="schedule"
-                element={
-                  <PlaceholderPage
-                    title="Schedule"
-                    description="Class timetable coming in Phase 2."
-                  />
-                }
+                element={<Schedule />}
               />
               <Route
                 path="materials"
@@ -206,12 +202,7 @@ function App() {
               />
               <Route
                 path="exports"
-                element={
-                  <PlaceholderPage
-                    title="Exports"
-                    description="Class lists and LIS prep exports planned for Phase 2."
-                  />
-                }
+                element={<Navigate to="/reports" replace />}
               />
             </Route>
 
