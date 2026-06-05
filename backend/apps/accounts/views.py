@@ -353,6 +353,30 @@ class UserManagementViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    def destroy(self, request, *args, **kwargs):
+        """Permanently delete a user account."""
+        user = self.get_object()
+
+        if user.id == request.user.id:
+            return Response(
+                {"error": "You cannot permanently delete your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.role == User.Role.ADMIN:
+            return Response(
+                {"error": "Administrator accounts cannot be permanently deleted from user management."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        email = user.email
+        user.delete()
+        logger.warning(f"User permanently deleted: {email} by admin: {request.user.email}")
+        return Response(
+            {"detail": "User account deleted permanently."},
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=['post'])
     def reset_password(self, request, pk=None):
         """Reset user password to a temporary password"""

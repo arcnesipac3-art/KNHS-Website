@@ -7,7 +7,8 @@ import Card from '../components/ui/Card'
 import PortalLayout from '../components/layout/PortalLayout'
 
 export default function UserManagement() {
-  const { user } = useAuth()
+  const { user: currentUser } = useAuth()
+  const isAdmin = currentUser?.role === 'admin'
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -112,6 +113,30 @@ export default function UserManagement() {
     }
   }
 
+  const handlePermanentDelete = async (targetUser) => {
+    const confirmedEmail = window.prompt(
+      `Type the user's email to permanently delete this account:\n\n${targetUser.email}`,
+      '',
+    )
+
+    if (confirmedEmail === null) {
+      return
+    }
+
+    if (confirmedEmail.trim().toLowerCase() !== targetUser.email.toLowerCase()) {
+      alert('Email confirmation did not match. Account was not deleted.')
+      return
+    }
+
+    try {
+      await api.delete(`/users/${targetUser.id}/`)
+      loadUsers()
+    } catch (err) {
+      console.error('Failed to delete user:', err)
+      alert(err.response?.data?.error || 'Failed to delete user. Please try again.')
+    }
+  }
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -120,7 +145,7 @@ export default function UserManagement() {
     })
   }
 
-  if (!['admin', 'principal'].includes(user?.role)) {
+  if (!['admin', 'principal'].includes(currentUser?.role)) {
     return (
       <PortalLayout>
         <Card>
@@ -145,6 +170,7 @@ export default function UserManagement() {
             Showing {meta.showing} of {meta.total} matching accounts
           </p>
         </div>
+        {isAdmin && (
         <Link to="/users/create">
           <Button>
             <svg
@@ -163,6 +189,7 @@ export default function UserManagement() {
             Create User
           </Button>
         </Link>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -299,58 +326,58 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
+              {users.map((listedUser) => (
+                <tr key={listedUser.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div>
-                      <div className="font-medium text-text">{user.full_name || 'N/A'}</div>
-                      <div className="text-sm text-muted">{user.email}</div>
+                      <div className="font-medium text-text">{listedUser.full_name || 'N/A'}</div>
+                      <div className="text-sm text-muted">{listedUser.email}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        roleBadgeColors[user.role] || 'bg-gray-100 text-gray-700'
+                        roleBadgeColors[listedUser.role] || 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      {roleLabels[user.role]}
+                      {roleLabels[listedUser.role]}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-muted">
-                    {user.lrn || user.employee_id || '—'}
+                    {listedUser.lrn || listedUser.employee_id || '—'}
                   </td>
                   <td className="px-6 py-4 text-sm text-muted">
-                    {user.grade_level
-                      ? `Grade ${user.grade_level}${user.strand ? ` - ${user.strand}` : ''}`
+                    {listedUser.grade_level
+                      ? `Grade ${listedUser.grade_level}${listedUser.strand ? ` - ${listedUser.strand}` : ''}`
                       : '—'}
                   </td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        user.is_active
+                        listedUser.is_active
                           ? 'bg-green-100 text-green-700'
                           : 'bg-red-100 text-red-700'
                       }`}
                     >
-                      {user.is_active ? 'Active' : 'Inactive'}
+                      {listedUser.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        user.is_approved
+                        listedUser.is_approved
                           ? 'bg-blue-100 text-blue-700'
                           : 'bg-amber-100 text-amber-700'
                       }`}
                     >
-                      {user.is_approved ? 'Approved' : 'Pending'}
+                      {listedUser.is_approved ? 'Approved' : 'Pending'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-muted">{formatDate(user.created_at)}</td>
+                  <td className="px-6 py-4 text-sm text-muted">{formatDate(listedUser.created_at)}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Link to={`/users/${user.id}/edit`}>
-                        <button className="rounded p-1 text-knhs-purple hover:bg-purple-50">
+                      <Link to={`/users/${listedUser.id}/edit`}>
+                        <button className="rounded p-1 text-knhs-purple hover:bg-purple-50" title="Edit user">
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
                               strokeLinecap="round"
@@ -361,10 +388,11 @@ export default function UserManagement() {
                           </svg>
                         </button>
                       </Link>
-                      {user.is_active ? (
+                      {isAdmin && listedUser.is_active ? (
                         <button
-                          onClick={() => handleDelete(user.id, user.email)}
+                          onClick={() => handleDelete(listedUser.id, listedUser.email)}
                           className="rounded p-1 text-red-600 hover:bg-red-50"
+                          title="Deactivate user"
                         >
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
@@ -375,10 +403,11 @@ export default function UserManagement() {
                             />
                           </svg>
                         </button>
-                      ) : (
+                      ) : isAdmin ? (
                         <button
-                          onClick={() => handleActivate(user.id)}
+                          onClick={() => handleActivate(listedUser.id)}
                           className="rounded p-1 text-green-600 hover:bg-green-50"
+                          title="Activate user"
                         >
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
@@ -386,6 +415,22 @@ export default function UserManagement() {
                               strokeLinejoin="round"
                               strokeWidth={2}
                               d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        </button>
+                      ) : null}
+                      {isAdmin && listedUser.role !== 'admin' && listedUser.id !== currentUser?.id && (
+                        <button
+                          onClick={() => handlePermanentDelete(listedUser)}
+                          className="rounded p-1 text-red-800 hover:bg-red-100"
+                          title="Delete account permanently"
+                        >
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"
                             />
                           </svg>
                         </button>
