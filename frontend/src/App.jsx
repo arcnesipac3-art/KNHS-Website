@@ -1,12 +1,28 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider } from './features/auth/AuthContext'
 import { ProtectedRoute, PublicOnlyRoute } from './features/auth/ProtectedRoute'
 import PublicLayout from './components/layout/PublicLayout'
 import DebugPanel from './components/ui/DebugPanel'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import LoadingSpinner from './components/ui/LoadingSpinner'
+import api from './lib/api'
+
+// Keep the Render free-tier backend alive by pinging it every 9 minutes.
+// Render sleeps after 15 min of inactivity; this prevents that cold-start delay.
+function useKeepAlive() {
+  useEffect(() => {
+    // Ping immediately on load so the server warms up right away
+    api.get('/auth/me/').catch(() => {})
+
+    const interval = setInterval(() => {
+      api.get('/auth/me/').catch(() => {}) // silent — we don't care about the response
+    }, 9 * 60 * 1000) // every 9 minutes
+
+    return () => clearInterval(interval)
+  }, [])
+}
 
 // Eager load critical pages
 import Home from './pages/Home'
@@ -65,6 +81,7 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  useKeepAlive()
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

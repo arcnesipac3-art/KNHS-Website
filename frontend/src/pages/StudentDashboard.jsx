@@ -12,11 +12,8 @@ export default function StudentDashboard() {
   const [dashboard, setDashboard] = useState(null)
   const [academicYear, setAcademicYear] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [slowWarning, setSlowWarning] = useState(false)
 
   useEffect(() => {
-    const warnTimer = setTimeout(() => setSlowWarning(true), 8000)
-
     async function loadDashboard() {
       const [dashboardResult, yearResult] = await Promise.allSettled([
         getStudentDashboard(),
@@ -36,25 +33,25 @@ export default function StudentDashboard() {
         setAcademicYear({ academicYear: null, quarters: [] })
       }
 
-      clearTimeout(warnTimer)
-      setSlowWarning(false)
       setLoading(false)
     }
 
     loadDashboard()
-    return () => clearTimeout(warnTimer)
   }, [])
 
   if (loading) {
     return (
       <PortalLayout>
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-purple-200 border-t-knhs-purple"></div>
-            <p className="mt-4 text-muted">Loading dashboard...</p>
-            {slowWarning && (
-              <p className="mt-2 text-sm text-amber-600">Server is waking up, this may take a moment...</p>
-            )}
+        <div className="space-y-8">
+          <div className="h-32 animate-pulse rounded-2xl bg-purple-200" />
+          <div className="grid gap-4 md:grid-cols-4">
+            {[1,2,3,4].map(i => <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-200" />)}
+          </div>
+          <div className="grid gap-8 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <div className="h-48 animate-pulse rounded-xl bg-gray-200" />
+            </div>
+            <div className="h-48 animate-pulse rounded-xl bg-gray-200" />
           </div>
         </div>
       </PortalLayout>
