@@ -55,16 +55,23 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const updateUser = useCallback((updatedData) => {
+    logAuthState('updateUser:start', { updatedData })
+    setUser(prevUser => ({ ...prevUser, ...updatedData }))
+    logAuthState('updateUser:complete', { updatedUser: { ...user, ...updatedData } })
+  }, [user])
+
   const value = useMemo(
     () => ({
       user,
       loading,
       login,
       logout,
+      updateUser,
       refreshUser: bootstrap,
       isAuthenticated: Boolean(user),
     }),
-    [user, loading, bootstrap],
+    [user, loading, bootstrap, updateUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

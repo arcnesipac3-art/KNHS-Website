@@ -28,6 +28,9 @@ import StudentGrades from './pages/StudentGrades'
 import Materials from './pages/Materials'
 import UploadMaterial from './pages/UploadMaterial'
 import Notifications from './pages/Notifications'
+import Profile from './pages/Profile'
+import ChangePassword from './pages/ChangePassword'
+import NotificationSettings from './pages/NotificationSettings'
 import EnrollmentApplication from './pages/EnrollmentApplication'
 import EnrollmentTracking from './pages/EnrollmentTracking'
 import EnrollmentManagement from './pages/EnrollmentManagement'
@@ -110,6 +113,18 @@ function App() {
               <Route
                 path="notifications"
                 element={<Notifications />}
+              />
+              <Route
+                path="profile"
+                element={<Profile />}
+              />
+              <Route
+                path="settings/password"
+                element={<ChangePassword />}
+              />
+              <Route
+                path="settings/notifications"
+                element={<NotificationSettings />}
               />
               <Route
                 path="people"

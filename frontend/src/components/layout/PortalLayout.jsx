@@ -91,6 +91,9 @@ export default function PortalLayout({ children }) {
             ))}
           </nav>
           <div className="border-t border-gray-100 px-4 py-4">
+            <Link to="/profile" className="mb-3 block rounded-lg p-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-knhs-purple">
+              ⚙️ Profile & Settings
+            </Link>
             <p className="truncate text-sm font-medium text-text">{user?.display_name}</p>
             <p className="text-xs text-muted">{ROLE_LABELS[user?.role]}</p>
             <button
