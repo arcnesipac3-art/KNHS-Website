@@ -41,8 +41,10 @@ export default function Analytics() {
     async function loadQuarters() {
       try {
         const { data } = await quarterApi.getAll()
-        setQuarters(data)
-        const current = data.find((q) => q.is_active)
+        // Handle both paginated {results:[]} and plain array
+        const arr = Array.isArray(data) ? data : (data?.results ?? [])
+        setQuarters(arr)
+        const current = arr.find((q) => q.is_active)
         if (current) {
           setSelectedQuarter(current.id)
         }

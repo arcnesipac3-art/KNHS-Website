@@ -71,6 +71,7 @@ const AssignmentList = lazy(() => import('./pages/AssignmentList'))
 const AttendanceHistory = lazy(() => import('./pages/AttendanceHistory'))
 const GuidanceDashboard = lazy(() => import('./pages/GuidanceDashboard'))
 const RegistrarDashboard = lazy(() => import('./pages/RegistrarDashboard'))
+const Reports = lazy(() => import('./pages/Reports'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -197,21 +198,11 @@ function App() {
               <Route path="admin/unlock-grades" element={<AdminUnlockGrades />} />
               <Route
                 path="reports"
-                element={
-                  <PlaceholderPage
-                    title="Reports"
-                    description="School reports and analytics planned for Phase 2."
-                  />
-                }
+                element={<Reports />}
               />
               <Route
                 path="students"
-                element={
-                  <PlaceholderPage
-                    title="Student Records"
-                    description="Student lookup and records coming in upcoming sprints."
-                  />
-                }
+                element={<Navigate to="/users?role=student" replace />}
               />
               <Route
                 path="exports"

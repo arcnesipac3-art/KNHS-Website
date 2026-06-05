@@ -450,71 +450,83 @@ class AnalyticsViewSet(viewsets.ViewSet):
         """
         Get quick overview stats for admin dashboard.
         """
-        # Get current quarter
-        current_quarter = Quarter.objects.filter(is_active=True).first()
+        try:
+            # Get current quarter
+            current_quarter = Quarter.objects.filter(is_active=True).first()
 
-        # Attendance stats (last 7 days)
-        today = timezone.now().date()
-        week_ago = today - timedelta(days=7)
-        attendance_records = AttendanceRecord.objects.filter(
-            date__gte=week_ago,
-            date__lte=today
-        )
-        total_att = attendance_records.count()
-        present_att = attendance_records.filter(status='present').count()
-        attendance_rate = round((present_att / total_att * 100), 2) if total_att > 0 else 0
+            # Attendance stats (last 7 days)
+            # Status values: 'P' (present), 'A' (absent), 'L' (late), 'E' (excused)
+            today = timezone.now().date()
+            week_ago = today - timedelta(days=7)
+            attendance_records = AttendanceRecord.objects.filter(
+                date__gte=week_ago,
+                date__lte=today
+            )
+            total_att = attendance_records.count()
+            present_att = attendance_records.filter(status='P').count()
+            attendance_rate = round((present_att / total_att * 100), 2) if total_att > 0 else 0
 
-        # Grade stats (current quarter)
-        grades = Grade.objects.filter(status__in=['published', 'locked'])
-        if current_quarter:
-            grades = grades.filter(quarter=current_quarter)
+            # Grade stats (current quarter)
+            grades = Grade.objects.filter(status__in=['published', 'locked'])
+            if current_quarter:
+                grades = grades.filter(quarter=current_quarter)
 
-        total_grades = grades.count()
-        passing_grades = grades.filter(transmuted_grade__gte=75).count()
-        grade_passing_rate = round((passing_grades / total_grades * 100), 2) if total_grades > 0 else 0
+            total_grades = grades.count()
+            passing_grades = grades.filter(transmuted_grade__gte=75).count()
+            grade_passing_rate = round((passing_grades / total_grades * 100), 2) if total_grades > 0 else 0
 
-        # Assignment stats (last 30 days)
-        month_ago = today - timedelta(days=30)
-        recent_assignments = Assignment.objects.filter(
-            status='published',
-            created_at__date__gte=month_ago
-        )
-        total_recent_assignments = recent_assignments.count()
+            # Assignment stats (last 30 days)
+            month_ago = today - timedelta(days=30)
+            recent_assignments = Assignment.objects.filter(
+                status='published',
+                created_at__date__gte=month_ago
+            )
+            total_recent_assignments = recent_assignments.count()
 
-        pending_grades_count = Submission.objects.filter(
-            assignment__in=recent_assignments,
-            status__in=['submitted', 'late']
-        ).count()
+            # Submission statuses: 'submitted', 'late', 'graded'
+            pending_grades_count = Submission.objects.filter(
+                assignment__in=recent_assignments,
+                status__in=['submitted', 'late']
+            ).count()
 
-        # Active users
-        from apps.accounts.models import User
-        active_students = User.objects.filter(role='student', is_active=True).count()
-        active_teachers = User.objects.filter(role='teacher', is_active=True).count()
+            # Active users
+            active_students = User.objects.filter(role='student', is_active=True).count()
+            active_teachers = User.objects.filter(role='teacher', is_active=True).count()
 
-        # Pending approvals
-        pending_approvals = Grade.objects.filter(status='pending_approval').count()
+            # Pending approvals
+            pending_approvals = Grade.objects.filter(status='pending_approval').count()
 
-        return Response({
-            'attendance': {
-                'rate': attendance_rate,
-                'period': 'Last 7 days',
-                'total_records': total_att
-            },
-            'grades': {
-                'passing_rate': grade_passing_rate,
-                'total_grades': total_grades,
-                'pending_approvals': pending_approvals
-            },
-            'assignments': {
-                'total_recent': total_recent_assignments,
-                'pending_grading': pending_grades_count
-            },
-            'users': {
-                'active_students': active_students,
-                'active_teachers': active_teachers
-            },
-            'current_quarter': {
-                'id': str(current_quarter.id) if current_quarter else None,
-                'name': current_quarter.name if current_quarter else None
-            }
-        })
+            return Response({
+                'attendance': {
+                    'rate': attendance_rate,
+                    'period': 'Last 7 days',
+                    'total_records': total_att
+                },
+                'grades': {
+                    'passing_rate': grade_passing_rate,
+                    'total_grades': total_grades,
+                    'pending_approvals': pending_approvals
+                },
+                'assignments': {
+                    'total_recent': total_recent_assignments,
+                    'pending_grading': pending_grades_count
+                },
+                'users': {
+                    'active_students': active_students,
+                    'active_teachers': active_teachers
+                },
+                'current_quarter': {
+                    'id': str(current_quarter.id) if current_quarter else None,
+                    'name': current_quarter.name if current_quarter else None
+                }
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"dashboard_overview error: {e}")
+            return Response({
+                'attendance': {'rate': 0, 'period': 'Last 7 days', 'total_records': 0},
+                'grades': {'passing_rate': 0, 'total_grades': 0, 'pending_approvals': 0},
+                'assignments': {'total_recent': 0, 'pending_grading': 0},
+                'users': {'active_students': 0, 'active_teachers': 0},
+                'current_quarter': {'id': None, 'name': None}
+            })

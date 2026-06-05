@@ -28,6 +28,7 @@ const NAV_BY_ROLE = {
     { to: '/enrollment', label: 'Enrollment' },
     { to: '/classes', label: 'Classes' },
     { to: '/report-cards', label: 'Report Cards' },
+    { to: '/reports', label: 'Reports' },
     { to: '/analytics', label: 'Analytics' },
     { to: '/announcements', label: 'Announcements' },
     { to: '/settings', label: 'Settings' },
@@ -38,8 +39,8 @@ const NAV_BY_ROLE = {
     { to: '/users', label: 'Users' },
     { to: '/analytics', label: 'Analytics' },
     { to: '/report-cards', label: 'Report Cards' },
-    { to: '/announcements', label: 'Announcements' },
     { to: '/reports', label: 'Reports' },
+    { to: '/announcements', label: 'Announcements' },
     { to: '/settings', label: 'Settings' },
   ],
   guidance: [
@@ -52,7 +53,7 @@ const NAV_BY_ROLE = {
     { to: '/enrollment', label: 'Enrollment Queue' },
     { to: '/students', label: 'Student Records' },
     { to: '/users', label: 'User Accounts' },
-    { to: '/exports', label: 'Exports' },
+    { to: '/reports', label: 'Reports & Exports' },
   ],
   parent: [
     { to: '/dashboard', label: 'Dashboard' },
