@@ -21,3 +21,4 @@ Thumbs.db
 
 # Credentials (do not commit)
 ADMIN_CREDENTIALS.md
+.env
