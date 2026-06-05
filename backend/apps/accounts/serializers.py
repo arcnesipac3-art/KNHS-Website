@@ -151,14 +151,35 @@ class CreateUserSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     def validate_email(self, value):
-        if User.objects.filter(email=value.lower()).exists():
+        # Normalize email
+        email = value.lower().strip()
+        
+        # Basic format validation (DRF already does this, but we can add more)
+        if len(email) > 254:
+            raise serializers.ValidationError("Email address is too long.")
+        
+        # Check for existing user
+        if User.objects.filter(email=email).exists():
             raise serializers.ValidationError("A user with this email already exists.")
-        return value.lower()
+        
+        return email
 
     def validate_lrn(self, value):
-        if value and UserProfile.objects.filter(lrn=value).exists():
+        if not value:
+            return value
+            
+        # Trim and validate LRN format
+        lrn = value.strip()
+        
+        # LRN should be exactly 12 digits
+        if lrn and (not lrn.isdigit() or len(lrn) != 12):
+            raise serializers.ValidationError("LRN must be exactly 12 digits.")
+        
+        # Check for duplicates
+        if lrn and UserProfile.objects.filter(lrn=lrn).exists():
             raise serializers.ValidationError("A user with this LRN already exists.")
-        return value
+        
+        return lrn
 
     def validate(self, data):
         role = data.get('role')

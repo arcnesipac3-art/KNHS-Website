@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -8,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
+import logging
 
 from .models import User
 from .serializers import (
@@ -20,6 +22,8 @@ from .serializers import (
     UserListSerializer,
     UserSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _set_refresh_cookie(response, refresh_token):
@@ -61,31 +65,37 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        email = serializer.validated_data["email"].lower()
         user = authenticate(
             request,
-            email=serializer.validated_data["email"].lower(),
+            email=email,
             password=serializer.validated_data["password"],
         )
 
         if user is None:
+            logger.warning(f"Failed login attempt for email: {email}")
             return Response(
                 {"error": {"code": "invalid_credentials", "message": "Invalid email or password."}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
         if not user.is_active:
+            logger.warning(f"Login attempt for inactive account: {email}")
             return Response(
-                {"error": {"code": "account_inactive", "message": "This account is inactive."}},
+                {"error": {"code": "account_inactive", "message": "This account is inactive. Please contact the administrator."}},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         if not user.is_approved and user.role != User.Role.ADMIN:
+            logger.info(f"Login attempt for unapproved account: {email}")
             return Response(
                 {"error": {"code": "account_pending", "message": "Your account is pending approval."}},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         refresh, access = _tokens_for_user(user)
+        logger.info(f"Successful login for user: {email} (role: {user.role})")
+        
         response = Response(
             {
                 "access_token": str(access),
@@ -103,6 +113,7 @@ class RefreshView(APIView):
     def post(self, request):
         refresh_token = request.COOKIES.get(settings.REFRESH_TOKEN_COOKIE_NAME)
         if not refresh_token:
+            logger.warning("Refresh attempt without token")
             return Response(
                 {"error": {"code": "missing_refresh", "message": "Refresh token not found."}},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -114,11 +125,31 @@ class RefreshView(APIView):
             from .models import User
 
             user = User.objects.get(id=user_id)
+            
+            # Check if user is still active
+            if not user.is_active:
+                logger.warning(f"Refresh attempt for inactive user: {user.email}")
+                response = Response(
+                    {"error": {"code": "account_inactive", "message": "Account is inactive."}},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+                _clear_refresh_cookie(response)
+                return response
+            
             refresh.blacklist()
             new_refresh, access = _tokens_for_user(user)
-        except (TokenError, User.DoesNotExist):
+        except TokenError as e:
+            logger.warning(f"Token refresh failed: {str(e)}")
             response = Response(
                 {"error": {"code": "invalid_refresh", "message": "Invalid or expired refresh token."}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+            _clear_refresh_cookie(response)
+            return response
+        except User.DoesNotExist:
+            logger.error(f"Refresh attempt for non-existent user ID: {user_id}")
+            response = Response(
+                {"error": {"code": "user_not_found", "message": "User not found."}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
             _clear_refresh_cookie(response)
@@ -137,10 +168,11 @@ class LogoutView(APIView):
         if refresh_token:
             try:
                 RefreshToken(refresh_token).blacklist()
+                logger.info(f"User logged out: {request.user.email}")
             except TokenError:
                 pass
 
-        response = Response({"detail": "Logged out."}, status=status.HTTP_200_OK)
+        response = Response({"detail": "Logged out successfully."}, status=status.HTTP_200_OK)
         _clear_refresh_cookie(response)
         return response
 
@@ -161,14 +193,24 @@ class ChangePasswordView(APIView):
 
         user = request.user
         if not user.check_password(serializer.validated_data["old_password"]):
+            logger.warning(f"Failed password change attempt for user: {user.email} (incorrect old password)")
             return Response(
                 {"error": "Current password is incorrect.", "old_password": ["Current password is incorrect."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Prevent reusing the same password
+        if user.check_password(serializer.validated_data["new_password"]):
+            return Response(
+                {"error": "New password must be different from current password.", "new_password": ["New password must be different from current password."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         user.set_password(serializer.validated_data["new_password"])
         user.must_change_password = False
         user.save(update_fields=["password", "must_change_password", "updated_at"])
+        
+        logger.info(f"Password changed successfully for user: {user.email}")
 
         return Response({"detail": "Password updated successfully."})
 
@@ -255,11 +297,21 @@ class UserManagementViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
         
-        # Return detailed user data
-        detail_serializer = UserDetailSerializer(user)
-        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
+        try:
+            with transaction.atomic():
+                user = serializer.save()
+                logger.info(f"User created successfully: {user.email} (role: {user.role}) by admin: {request.user.email}")
+                
+                # Return detailed user data
+                detail_serializer = UserDetailSerializer(user)
+                return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.error(f"Failed to create user: {str(e)}")
+            return Response(
+                {"error": "Failed to create user. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -272,16 +324,33 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             context={'user': instance}
         )
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
         
-        # Return detailed user data
-        detail_serializer = UserDetailSerializer(user)
-        return Response(detail_serializer.data)
+        try:
+            with transaction.atomic():
+                user = serializer.save()
+                logger.info(f"User updated successfully: {user.email} by admin: {request.user.email}")
+                
+                # Return detailed user data
+                detail_serializer = UserDetailSerializer(user)
+                return Response(detail_serializer.data)
+        except Exception as e:
+            logger.error(f"Failed to update user {instance.email}: {str(e)}")
+            return Response(
+                {"error": "Failed to update user. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['post'])
     def reset_password(self, request, pk=None):
         """Reset user password to a temporary password"""
         user = self.get_object()
+        
+        # Prevent resetting admin passwords
+        if user.role == User.Role.ADMIN and request.user.id != user.id:
+            return Response(
+                {"error": "Cannot reset admin user passwords."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Generate temporary password
         import secrets
@@ -290,6 +359,8 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         user.set_password(temp_password)
         user.must_change_password = True
         user.save(update_fields=['password', 'must_change_password'])
+        
+        logger.info(f"Password reset for user: {user.email} by admin: {request.user.email}")
         
         return Response({
             'detail': 'Password reset successfully.',
@@ -301,8 +372,25 @@ class UserManagementViewSet(viewsets.ModelViewSet):
     def deactivate(self, request, pk=None):
         """Deactivate user account"""
         user = self.get_object()
+        
+        # Prevent deactivating own account
+        if user.id == request.user.id:
+            return Response(
+                {"error": "You cannot deactivate your own account."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Prevent deactivating admin users (unless you're an admin)
+        if user.role == User.Role.ADMIN and request.user.role != User.Role.ADMIN:
+            return Response(
+                {"error": "You don't have permission to deactivate admin users."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         user.is_active = False
         user.save(update_fields=['is_active'])
+        
+        logger.info(f"User deactivated: {user.email} by admin: {request.user.email}")
         
         return Response({'detail': 'User deactivated successfully.'})
 
@@ -312,6 +400,8 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         user.is_active = True
         user.save(update_fields=['is_active'])
+        
+        logger.info(f"User activated: {user.email} by admin: {request.user.email}")
         
         return Response({'detail': 'User activated successfully.'})
 

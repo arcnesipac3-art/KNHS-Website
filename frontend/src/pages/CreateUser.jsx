@@ -59,29 +59,46 @@ export default function CreateUser() {
     setError(null)
     setLoading(true)
 
+    // Validation
+    if (!formData.password || formData.password.length < 8) {
+      setError('Password must be at least 8 characters long')
+      setLoading(false)
+      return
+    }
+
     try {
       // Prepare data
       const data = {
-        email: formData.email.toLowerCase(),
+        email: formData.email.toLowerCase().trim(),
         password: formData.password,
         role: formData.role,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        middle_name: formData.middle_name,
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        middle_name: formData.middle_name.trim(),
         must_change_password: formData.must_change_password,
         is_approved: formData.is_approved,
       }
 
       // Add role-specific fields
       if (formData.role === 'student') {
-        data.lrn = formData.lrn
+        if (!formData.lrn || !formData.grade_level) {
+          setError('LRN and Grade Level are required for students')
+          setLoading(false)
+          return
+        }
+        data.lrn = formData.lrn.trim()
         data.grade_level = formData.grade_level ? parseInt(formData.grade_level) : null
         if (formData.strand) data.strand = formData.strand
       } else if (formData.role === 'teacher') {
-        data.employee_id = formData.employee_id
+        if (!formData.employee_id) {
+          setError('Employee ID is required for teachers')
+          setLoading(false)
+          return
+        }
+        data.employee_id = formData.employee_id.trim()
       }
 
-      if (formData.phone) data.phone = formData.phone
+      if (formData.phone) data.phone = formData.phone.trim()
 
       const response = await api.post('/users/', data)
       
@@ -91,7 +108,7 @@ export default function CreateUser() {
       // Wait a moment then navigate
       setTimeout(() => {
         navigate('/users')
-      }, 3000)
+      }, 5000)
     } catch (err) {
       console.error('Failed to create user:', err)
       if (err.response?.data) {
