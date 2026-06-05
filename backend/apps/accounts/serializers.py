@@ -195,8 +195,12 @@ class CreateUserSerializer(serializers.Serializer):
         password = validated_data.pop('password')
         user = User.objects.create_user(password=password, **validated_data)
 
-        # Create profile
-        UserProfile.objects.create(user=user, **profile_fields)
+        # Update the profile created by signal (don't create duplicate)
+        # The post_save signal already created an empty profile
+        profile = user.profile
+        for field, value in profile_fields.items():
+            setattr(profile, field, value)
+        profile.save()
 
         return user
 
