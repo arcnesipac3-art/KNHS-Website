@@ -135,12 +135,7 @@ function App() {
               />
               <Route
                 path="people"
-                element={
-                  <PlaceholderPage
-                    title="People"
-                    description="Student and teacher management coming in Sprint 2."
-                  />
-                }
+                element={<Navigate to="/users" replace />}
               />
               <Route
                 path="enrollment"
