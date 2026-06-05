@@ -33,6 +33,7 @@ import Notifications from './pages/Notifications'
 import Profile from './pages/Profile'
 import ChangePassword from './pages/ChangePassword'
 import NotificationSettings from './pages/NotificationSettings'
+import Settings from './pages/Settings'
 import EnrollmentApplication from './pages/EnrollmentApplication'
 import EnrollmentTracking from './pages/EnrollmentTracking'
 import EnrollmentManagement from './pages/EnrollmentManagement'
@@ -155,12 +156,7 @@ function App() {
               />
               <Route
                 path="settings"
-                element={
-                  <PlaceholderPage
-                    title="Settings"
-                    description="School settings and academic calendar coming soon."
-                  />
-                }
+                element={<Settings />}
               />
               <Route
                 path="approvals"
