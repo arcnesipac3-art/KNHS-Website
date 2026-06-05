@@ -52,8 +52,9 @@ export default function UserManagement() {
       if (filters.search) params.search = filters.search
 
       const { data } = await userApi.getAll(params)
-      // Ensure data is always an array
-      setUsers(Array.isArray(data) ? data : [])
+      // Handle both paginated { count, results: [...] } and plain array responses
+      const list = Array.isArray(data) ? data : (data?.results ?? [])
+      setUsers(list)
     } catch (err) {
       console.error('Failed to load users:', err)
       setError('Failed to load users. Please try again.')
@@ -262,9 +263,9 @@ export default function UserManagement() {
                     <tr key={user.id} className="text-sm">
                       <td className="py-4">
                         <div>
-                          <p className="font-medium text-text">{user.display_name}</p>
-                          {user.profile_grade_level && (
-                            <p className="text-xs text-muted">Grade {user.profile_grade_level}</p>
+                          <p className="font-medium text-text">{user.full_name || user.email}</p>
+                          {user.grade_level && (
+                            <p className="text-xs text-muted">Grade {user.grade_level}</p>
                           )}
                         </div>
                       </td>
@@ -280,7 +281,7 @@ export default function UserManagement() {
                         </span>
                       </td>
                       <td className="py-4 text-muted">
-                        {user.profile_lrn || user.profile_employee_id || '—'}
+                        {user.lrn || user.employee_id || '—'}
                       </td>
                       <td className="py-4">
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -301,13 +302,13 @@ export default function UserManagement() {
                               Edit
                             </button>
                             <button
-                              onClick={() => handleResetPassword(user.id, user.display_name)}
+                              onClick={() => handleResetPassword(user.id, user.full_name || user.email)}
                               className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
                             >
                               Reset Password
                             </button>
                             <button
-                              onClick={() => handleActivateDeactivate(user.id, user.is_active, user.display_name)}
+                              onClick={() => handleActivateDeactivate(user.id, user.is_active, user.full_name || user.email)}
                               className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
                                 user.is_active
                                   ? 'border-yellow-300 text-yellow-700 hover:bg-yellow-50'
@@ -318,7 +319,7 @@ export default function UserManagement() {
                             </button>
                             {user.role !== 'admin' && (
                               <button
-                                onClick={() => handleDelete(user.id, user.display_name)}
+                                onClick={() => handleDelete(user.id, user.full_name || user.email)}
                                 className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
                               >
                                 Delete
@@ -534,12 +535,12 @@ function EditUserModal({ user, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     email: user.email || '',
     role: user.role || 'student',
-    first_name: user.profile_first_name || '',
-    last_name: user.profile_last_name || '',
-    lrn: user.profile_lrn || '',
-    employee_id: user.profile_employee_id || '',
-    grade_level: user.profile_grade_level || '',
-    contact_number: user.profile_contact_number || '',
+    first_name: user.profile?.first_name || '',
+    last_name: user.profile?.last_name || '',
+    lrn: user.lrn || user.profile?.lrn || '',
+    employee_id: user.employee_id || user.profile?.employee_id || '',
+    grade_level: user.grade_level || user.profile?.grade_level || '',
+    contact_number: user.phone || user.profile?.phone || '',
     is_active: user.is_active,
     is_approved: user.is_approved,
   })
