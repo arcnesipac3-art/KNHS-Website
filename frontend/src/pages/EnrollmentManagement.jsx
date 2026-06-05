@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
@@ -26,10 +25,12 @@ export default function EnrollmentManagement() {
     try {
       const params = filter !== 'all' ? { status: filter } : {}
       const { data } = await api.get('/enrollment-applications/', { params })
-      setApplications(data)
+      // Ensure data is always an array
+      setApplications(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Failed to load applications:', err)
       setError('Failed to load applications')
+      setApplications([]) // Reset to empty array on error
     } finally {
       setLoading(false)
     }
@@ -61,13 +62,13 @@ export default function EnrollmentManagement() {
     }
   }
 
-  // Filter stats
+  // Filter stats - safely handle non-array data
   const stats = {
-    all: applications.length,
-    pending: applications.filter((a) => a.status === 'pending').length,
-    under_review: applications.filter((a) => a.status === 'under_review').length,
-    approved: applications.filter((a) => a.status === 'approved').length,
-    rejected: applications.filter((a) => a.status === 'rejected').length,
+    all: Array.isArray(applications) ? applications.length : 0,
+    pending: Array.isArray(applications) ? applications.filter((a) => a.status === 'pending').length : 0,
+    under_review: Array.isArray(applications) ? applications.filter((a) => a.status === 'under_review').length : 0,
+    approved: Array.isArray(applications) ? applications.filter((a) => a.status === 'approved').length : 0,
+    rejected: Array.isArray(applications) ? applications.filter((a) => a.status === 'rejected').length : 0,
   }
 
   // Check user permission
@@ -156,7 +157,7 @@ export default function EnrollmentManagement() {
                 <p className="mt-4 text-muted">Loading applications...</p>
               </div>
             </div>
-          ) : applications.length === 0 ? (
+          ) : !Array.isArray(applications) || applications.length === 0 ? (
             <div className="py-12 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
                 <svg className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -185,7 +186,7 @@ export default function EnrollmentManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {applications.map((application) => (
+                  {Array.isArray(applications) && applications.map((application) => (
                     <ApplicationRow
                       key={application.id}
                       application={application}
