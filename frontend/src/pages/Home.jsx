@@ -17,8 +17,11 @@ export default function Home() {
             <Link to="/login">
               <Button>Enter Portal</Button>
             </Link>
+            <Link to="/enrollment/apply">
+              <Button variant="secondary">Apply for Enrollment</Button>
+            </Link>
             <Link to="/about">
-              <Button variant="secondary">Learn More</Button>
+              <Button variant="outline">Learn More</Button>
             </Link>
           </div>
         </div>
@@ -41,6 +44,28 @@ export default function Home() {
               Building responsible, competent, and values-driven graduates for the nation.
             </p>
           </Card>
+        </div>
+      </section>
+
+      {/* Enrollment CTA Section */}
+      <section className="bg-gradient-to-br from-knhs-purple to-purple-700">
+        <div className="mx-auto max-w-4xl px-4 py-16 text-center">
+          <h2 className="text-3xl font-bold text-white">Enrollment Now Open</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-purple-100">
+            School Year 2026-2027 enrollment is now accepting applications. Apply online and track your application status.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link to="/enrollment/apply">
+              <Button className="bg-white text-knhs-purple hover:bg-gray-100">
+                Apply Now
+              </Button>
+            </Link>
+            <Link to="/enrollment/track">
+              <Button variant="outline" className="border-white text-white hover:bg-white/10">
+                Track Application
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

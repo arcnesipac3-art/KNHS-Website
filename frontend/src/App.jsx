@@ -28,6 +28,9 @@ import StudentGrades from './pages/StudentGrades'
 import Materials from './pages/Materials'
 import UploadMaterial from './pages/UploadMaterial'
 import Notifications from './pages/Notifications'
+import EnrollmentApplication from './pages/EnrollmentApplication'
+import EnrollmentTracking from './pages/EnrollmentTracking'
+import EnrollmentManagement from './pages/EnrollmentManagement'
 
 const queryClient = new QueryClient()
 
@@ -41,6 +44,8 @@ function App() {
               <Route index element={<Home />} />
               <Route path="about" element={<About />} />
               <Route path="contact" element={<Contact />} />
+              <Route path="enrollment/apply" element={<EnrollmentApplication />} />
+              <Route path="enrollment/track" element={<EnrollmentTracking />} />
             </Route>
 
             <Route element={<PublicOnlyRoute />}>
@@ -117,12 +122,7 @@ function App() {
               />
               <Route
                 path="enrollment"
-                element={
-                  <PlaceholderPage
-                    title="Enrollment"
-                    description="Online enrollment pipeline coming in Sprint 5."
-                  />
-                }
+                element={<EnrollmentManagement />}
               />
               <Route
                 path="settings"
