@@ -55,7 +55,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Custom security middleware - TEMPORARILY DISABLED for debugging
     # "config.middleware.RateLimitMiddleware",
-    "config.middleware.SecurityHeadersMiddleware",
+    # "config.middleware.SecurityHeadersMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

@@ -42,14 +42,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     # Flatten profile fields into user serializer for frontend convenience
-    first_name = serializers.CharField(source='profile.first_name', read_only=True)
-    last_name = serializers.CharField(source='profile.last_name', read_only=True)
-    phone = serializers.CharField(source='profile.phone', read_only=True)
-    avatar_url = serializers.URLField(source='profile.avatar_url', read_only=True)
-    lrn = serializers.CharField(source='profile.lrn', read_only=True)
-    grade_level = serializers.IntegerField(source='profile.grade_level', read_only=True)
-    strand = serializers.CharField(source='profile.strand', read_only=True)
-    employee_id = serializers.CharField(source='profile.employee_id', read_only=True)
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
+    lrn = serializers.SerializerMethodField()
+    grade_level = serializers.SerializerMethodField()
+    strand = serializers.SerializerMethodField()
+    employee_id = serializers.SerializerMethodField()
     display_name = serializers.ReadOnlyField()
     is_active = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
@@ -77,6 +77,30 @@ class UserSerializer(serializers.ModelSerializer):
             "employee_id",
         )
         read_only_fields = fields
+
+    def get_first_name(self, obj):
+        return getattr(obj.profile, 'first_name', '') if hasattr(obj, 'profile') else ''
+    
+    def get_last_name(self, obj):
+        return getattr(obj.profile, 'last_name', '') if hasattr(obj, 'profile') else ''
+    
+    def get_phone(self, obj):
+        return getattr(obj.profile, 'phone', '') if hasattr(obj, 'profile') else ''
+    
+    def get_avatar_url(self, obj):
+        return getattr(obj.profile, 'avatar_url', '') if hasattr(obj, 'profile') else ''
+    
+    def get_lrn(self, obj):
+        return getattr(obj.profile, 'lrn', '') if hasattr(obj, 'profile') else ''
+    
+    def get_grade_level(self, obj):
+        return getattr(obj.profile, 'grade_level', None) if hasattr(obj, 'profile') else None
+    
+    def get_strand(self, obj):
+        return getattr(obj.profile, 'strand', '') if hasattr(obj, 'profile') else ''
+    
+    def get_employee_id(self, obj):
+        return getattr(obj.profile, 'employee_id', '') if hasattr(obj, 'profile') else ''
 
 
 class LoginSerializer(serializers.Serializer):
