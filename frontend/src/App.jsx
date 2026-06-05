@@ -6,6 +6,8 @@ import PublicLayout from './components/layout/PublicLayout'
 import DebugPanel from './components/ui/DebugPanel'
 import Home from './pages/Home'
 import About from './pages/About'
+import Academics from './pages/Academics'
+import News from './pages/News'
 import Contact from './pages/Contact'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -46,6 +48,8 @@ function App() {
             <Route element={<PublicLayout />}>
               <Route index element={<Home />} />
               <Route path="about" element={<About />} />
+              <Route path="academics" element={<Academics />} />
+              <Route path="news" element={<News />} />
               <Route path="contact" element={<Contact />} />
               <Route path="enrollment/apply" element={<EnrollmentApplication />} />
               <Route path="enrollment/track" element={<EnrollmentTracking />} />

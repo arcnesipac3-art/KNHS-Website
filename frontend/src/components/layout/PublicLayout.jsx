@@ -20,6 +20,8 @@ export default function PublicLayout() {
           <nav className="hidden items-center gap-6 text-sm font-medium text-gray-700 md:flex">
             <Link to="/" className="hover:text-knhs-purple">Home</Link>
             <Link to="/about" className="hover:text-knhs-purple">About</Link>
+            <Link to="/academics" className="hover:text-knhs-purple">Academics</Link>
+            <Link to="/news" className="hover:text-knhs-purple">News & Events</Link>
             <Link to="/contact" className="hover:text-knhs-purple">Contact</Link>
             <Link
               to="/login"
