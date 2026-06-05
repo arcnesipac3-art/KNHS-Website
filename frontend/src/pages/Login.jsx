@@ -1,18 +1,29 @@
-import { Link } from 'react-router-dom'
-import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../features/auth/AuthContext'
 import { ROLE_HOME, school } from '../styles/design-tokens'
 import DepEdHeader from '../components/layout/DepEdHeader'
 import Button from '../components/ui/Button'
-import Input from '../components/ui/Input'
 import Card from '../components/ui/Card'
 
 export default function Login() {
   const { login } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setError('Your session expired. Please sign in again.')
+    }
+
+    window.addEventListener('auth:session-expired', handleSessionExpired)
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired)
+  }, [])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -20,9 +31,13 @@ export default function Login() {
     setSubmitting(true)
     try {
       const user = await login(email.trim().toLowerCase(), password)
-      window.location.href = user.must_change_password
-        ? '/force-password-change'
-        : ROLE_HOME[user.role] || '/dashboard'
+      const nextPath = location.state?.from?.pathname
+      navigate(
+        user.must_change_password
+          ? '/force-password-change'
+          : nextPath || ROLE_HOME[user.role] || '/dashboard',
+        { replace: true },
+      )
     } catch (err) {
       const message =
         err.response?.data?.error?.message ||
@@ -50,24 +65,45 @@ export default function Login() {
 
         <Card title="Portal Sign In" subtitle="Use your school email and password." className="w-full max-w-md">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              label="Password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div>
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-text">
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition-colors focus:border-knhs-purple focus:ring-2 focus:ring-purple-100"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-text">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 pr-24 text-sm outline-none transition-colors focus:border-knhs-purple focus:ring-2 focus:ring-purple-100"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-3 text-sm font-medium text-knhs-purple hover:text-purple-700"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
             {error && (
               <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
             )}
@@ -76,6 +112,7 @@ export default function Login() {
             </Button>
           </form>
           <div className="mt-5 flex flex-col gap-2 text-center text-sm text-muted">
+            <Link to="/enrollment/track" className="hover:text-knhs-purple">Track enrollment</Link>
             <Link to="/" className="hover:text-knhs-purple">Back to public site</Link>
           </div>
         </Card>

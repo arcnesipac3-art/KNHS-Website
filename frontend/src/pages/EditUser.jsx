@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthContext'
 import api from '../lib/api'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import PortalLayout from '../components/layout/PortalLayout'
 
 export default function EditUser() {
+  const { user: currentUser } = useAuth()
   const { id } = useParams()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [user, setUser] = useState(null)
+  const [passwordResetResult, setPasswordResetResult] = useState(null)
   const [formData, setFormData] = useState({
     role: '',
     is_active: true,
@@ -75,9 +79,28 @@ export default function EditUser() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value,
+    const nextValue = type === 'checkbox' ? checked : value
+    setFormData((prev) => {
+      const nextState = {
+        ...prev,
+        [name]: nextValue,
+      }
+
+      if (name === 'role' && value !== 'student') {
+        nextState.lrn = ''
+        nextState.grade_level = ''
+        nextState.strand = ''
+      }
+
+      if (name === 'role' && value !== 'teacher') {
+        nextState.employee_id = ''
+      }
+
+      if (name === 'grade_level' && parseInt(value || '0', 10) < 11) {
+        nextState.strand = ''
+      }
+
+      return nextState
     })
   }
 
@@ -127,13 +150,14 @@ export default function EditUser() {
   }
 
   const handleResetPassword = async () => {
-    if (!window.confirm('Reset password for this user? They will receive a temporary password.')) {
+    if (!window.confirm('Reset password for this user?')) {
       return
     }
 
     try {
+      setPasswordResetResult(null)
       const response = await api.post(`/users/${id}/reset_password/`)
-      alert(`Password reset successfully!\n\nTemporary Password: ${response.data.temporary_password}\n\nUser must change this password on next login.`)
+      setPasswordResetResult(response.data)
     } catch (err) {
       console.error('Failed to reset password:', err)
       alert('Failed to reset password. Please try again.')
@@ -143,20 +167,36 @@ export default function EditUser() {
   const isStudent = formData.role === 'student'
   const isTeacher = formData.role === 'teacher'
 
+  if (currentUser?.role !== 'admin') {
+    return (
+      <PortalLayout>
+        <Card>
+          <div className="py-8 text-center">
+            <h2 className="text-lg font-semibold text-text">Access Denied</h2>
+            <p className="mt-2 text-sm text-muted">Only administrators can edit user accounts.</p>
+          </div>
+        </Card>
+      </PortalLayout>
+    )
+  }
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <PortalLayout>
+      <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-knhs-purple border-t-transparent"></div>
           <p className="mt-4 text-muted">Loading user...</p>
         </div>
       </div>
+      </PortalLayout>
     )
   }
 
   if (error && !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <PortalLayout>
+      <div className="flex min-h-[400px] items-center justify-center">
         <Card title="Error">
           <p className="text-red-600">{error}</p>
           <Button onClick={loadUser} className="mt-4">
@@ -164,11 +204,13 @@ export default function EditUser() {
           </Button>
         </Card>
       </div>
+      </PortalLayout>
     )
   }
 
   return (
-    <div className="p-8">
+    <PortalLayout>
+    <div>
       <div className="mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
@@ -250,6 +292,18 @@ export default function EditUser() {
                 </div>
               </div>
             </Card>
+
+            {passwordResetResult && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-medium text-green-800">Password reset successful.</p>
+                <p className="mt-2 text-sm text-green-700">
+                  Temporary password:
+                  {' '}
+                  <span className="font-mono font-semibold">{passwordResetResult.temporary_password}</span>
+                </p>
+                <p className="mt-1 text-xs text-green-700">The user will be required to change it on next login.</p>
+              </div>
+            )}
 
             {/* Personal Information */}
             <Card title="Personal Information" subtitle="User's name and contact">
@@ -412,5 +466,6 @@ export default function EditUser() {
         </form>
       </div>
     </div>
+    </PortalLayout>
   )
 }

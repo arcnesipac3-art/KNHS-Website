@@ -150,6 +150,34 @@ class CreateUserSerializer(serializers.Serializer):
     employee_id = serializers.CharField(max_length=50, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
+    @staticmethod
+    def _clean_optional_text(value):
+        return value.strip() if isinstance(value, str) else value
+
+    def validate_first_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("First name is required.")
+        return value
+
+    def validate_last_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Last name is required.")
+        return value
+
+    def validate_middle_name(self, value):
+        return self._clean_optional_text(value)
+
+    def validate_strand(self, value):
+        return self._clean_optional_text(value)
+
+    def validate_employee_id(self, value):
+        return self._clean_optional_text(value)
+
+    def validate_phone(self, value):
+        return self._clean_optional_text(value)
+
     def validate_email(self, value):
         # Normalize email
         email = value.lower().strip()
@@ -166,7 +194,7 @@ class CreateUserSerializer(serializers.Serializer):
 
     def validate_lrn(self, value):
         if not value:
-            return value
+            return None
             
         # Trim and validate LRN format
         lrn = value.strip()
@@ -183,19 +211,30 @@ class CreateUserSerializer(serializers.Serializer):
 
     def validate(self, data):
         role = data.get('role')
+        grade_level = data.get('grade_level')
+        strand = data.get('strand', '')
+        employee_id = data.get('employee_id', '')
         
         # Validate role-specific required fields
         if role == User.Role.STUDENT:
             if not data.get('lrn'):
                 raise serializers.ValidationError({"lrn": "LRN is required for students."})
-            if data.get('grade_level') is None:
+            if grade_level is None:
                 raise serializers.ValidationError({"grade_level": "Grade level is required for students."})
             # Validate grade level range
-            if data.get('grade_level') and not (7 <= data.get('grade_level') <= 12):
+            if grade_level and not (7 <= grade_level <= 12):
                 raise serializers.ValidationError({"grade_level": "Grade level must be between 7 and 12."})
-        
-        if role == User.Role.TEACHER and not data.get('employee_id'):
+            if grade_level >= 11 and not strand:
+                raise serializers.ValidationError({"strand": "Strand is required for Senior High School students."})
+        else:
+            data['lrn'] = None
+            data['grade_level'] = None
+            data['strand'] = ''
+
+        if role == User.Role.TEACHER and not employee_id:
             raise serializers.ValidationError({"employee_id": "Employee ID is required for teachers."})
+        if role != User.Role.TEACHER:
+            data['employee_id'] = employee_id or ''
         
         return data
 
@@ -244,12 +283,76 @@ class UpdateUserSerializer(serializers.Serializer):
     employee_id = serializers.CharField(max_length=50, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
+    @staticmethod
+    def _clean_optional_text(value):
+        return value.strip() if isinstance(value, str) else value
+
+    def validate_first_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("First name is required.")
+        return value
+
+    def validate_last_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Last name is required.")
+        return value
+
+    def validate_middle_name(self, value):
+        return self._clean_optional_text(value)
+
+    def validate_strand(self, value):
+        return self._clean_optional_text(value)
+
+    def validate_employee_id(self, value):
+        return self._clean_optional_text(value)
+
+    def validate_phone(self, value):
+        return self._clean_optional_text(value)
+
     def validate_lrn(self, value):
+        if not value:
+            return None
+
+        value = value.strip()
+        if not value.isdigit() or len(value) != 12:
+            raise serializers.ValidationError("LRN must be exactly 12 digits.")
+
         # Check if LRN is already taken by another user
         user = self.context.get('user')
         if value and UserProfile.objects.filter(lrn=value).exclude(user=user).exists():
             raise serializers.ValidationError("A user with this LRN already exists.")
         return value
+
+    def validate(self, data):
+        user = self.context.get('user')
+        role = data.get('role', user.role)
+        grade_level = data.get('grade_level', user.profile.grade_level)
+        strand = data.get('strand', user.profile.strand)
+        employee_id = data.get('employee_id', user.profile.employee_id)
+
+        if role == User.Role.STUDENT:
+            lrn = data.get('lrn', user.profile.lrn)
+            if not lrn:
+                raise serializers.ValidationError({"lrn": "LRN is required for students."})
+            if grade_level is None:
+                raise serializers.ValidationError({"grade_level": "Grade level is required for students."})
+            if not (7 <= grade_level <= 12):
+                raise serializers.ValidationError({"grade_level": "Grade level must be between 7 and 12."})
+            if grade_level >= 11 and not strand:
+                raise serializers.ValidationError({"strand": "Strand is required for Senior High School students."})
+        else:
+            data['lrn'] = None
+            data['grade_level'] = None
+            data['strand'] = ''
+
+        if role == User.Role.TEACHER and not employee_id:
+            raise serializers.ValidationError({"employee_id": "Employee ID is required for teachers."})
+        if role != User.Role.TEACHER:
+            data['employee_id'] = self._clean_optional_text(employee_id) or ''
+
+        return data
 
     def update(self, instance, validated_data):
         # Update user fields
@@ -267,6 +370,14 @@ class UpdateUserSerializer(serializers.Serializer):
         for field in profile_fields:
             if field in validated_data:
                 setattr(profile, field, validated_data[field])
+
+        if instance.role != User.Role.STUDENT:
+            profile.lrn = None
+            profile.grade_level = None
+            profile.strand = ''
+
+        if instance.role != User.Role.TEACHER:
+            profile.employee_id = ''
         
         profile.save()
 

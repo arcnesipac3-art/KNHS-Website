@@ -44,6 +44,9 @@ export function PublicOnlyRoute() {
   }
 
   if (user) {
+    if (user.must_change_password) {
+      return <Navigate to="/force-password-change" replace />
+    }
     const home = ROLE_HOME[user.role] || '/dashboard'
     return <Navigate to={home} replace />
   }

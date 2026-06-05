@@ -242,6 +242,15 @@ class IsAdminUser(IsAuthenticated):
     def has_permission(self, request, view):
         return (
             super().has_permission(request, view) and
+            request.user.role == User.Role.ADMIN
+        )
+
+
+class IsAdminOrPrincipalReadOnly(IsAuthenticated):
+    """Permission class for read-only user management access"""
+    def has_permission(self, request, view):
+        return (
+            super().has_permission(request, view) and
             request.user.role in [User.Role.ADMIN, User.Role.PRINCIPAL]
         )
 
@@ -251,8 +260,12 @@ class UserManagementViewSet(viewsets.ModelViewSet):
     ViewSet for managing users (admin only).
     Provides CRUD operations for user accounts.
     """
-    permission_classes = [IsAdminUser]
     queryset = User.objects.select_related('profile').all()
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAdminOrPrincipalReadOnly()]
+        return [IsAdminUser()]
     
     def get_serializer_class(self):
         if self.action == 'list':

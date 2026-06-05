@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
       setUser(null)
     } finally {
       setLoading(false)
-      logAuthState('bootstrap:complete', { hasUser: Boolean(user) })
+      logAuthState('bootstrap:complete', {})
     }
   }, [])
 
@@ -57,9 +57,12 @@ export function AuthProvider({ children }) {
 
   const updateUser = useCallback((updatedData) => {
     logAuthState('updateUser:start', { updatedData })
-    setUser(prevUser => ({ ...prevUser, ...updatedData }))
-    logAuthState('updateUser:complete', { updatedUser: { ...user, ...updatedData } })
-  }, [user])
+    setUser((prevUser) => {
+      const nextUser = { ...prevUser, ...updatedData }
+      logAuthState('updateUser:complete', { updatedUser: nextUser })
+      return nextUser
+    })
+  }, [])
 
   const value = useMemo(
     () => ({

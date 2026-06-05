@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthContext'
 import api from '../lib/api'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import PortalLayout from '../components/layout/PortalLayout'
 
 export default function CreateUser() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -39,9 +42,28 @@ export default function CreateUser() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value,
+    const nextValue = type === 'checkbox' ? checked : value
+    setFormData((prev) => {
+      const nextState = {
+        ...prev,
+        [name]: nextValue,
+      }
+
+      if (name === 'role' && value !== 'student') {
+        nextState.lrn = ''
+        nextState.grade_level = ''
+        nextState.strand = ''
+      }
+
+      if (name === 'role' && value !== 'teacher') {
+        nextState.employee_id = ''
+      }
+
+      if (name === 'grade_level' && parseInt(value || '0', 10) < 11) {
+        nextState.strand = ''
+      }
+
+      return nextState
     })
   }
 
@@ -100,15 +122,9 @@ export default function CreateUser() {
 
       if (formData.phone) data.phone = formData.phone.trim()
 
-      const response = await api.post('/users/', data)
+      await api.post('/users/', data)
       
-      // Show temporary password before navigating
       setTempPassword(formData.password)
-      
-      // Wait a moment then navigate
-      setTimeout(() => {
-        navigate('/users')
-      }, 5000)
     } catch (err) {
       console.error('Failed to create user:', err)
       if (err.response?.data) {
@@ -136,10 +152,24 @@ export default function CreateUser() {
   const isStudent = formData.role === 'student'
   const isTeacher = formData.role === 'teacher'
 
+  if (user?.role !== 'admin') {
+    return (
+      <PortalLayout>
+        <Card>
+          <div className="py-8 text-center">
+            <h2 className="text-lg font-semibold text-text">Access Denied</h2>
+            <p className="mt-2 text-sm text-muted">Only administrators can create user accounts.</p>
+          </div>
+        </Card>
+      </PortalLayout>
+    )
+  }
+
   if (tempPassword) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-8">
-        <Card title="User Created Successfully!" subtitle="Important: Save this information">
+      <PortalLayout>
+        <div className="mx-auto max-w-2xl">
+        <Card title="User Created Successfully!" subtitle="Save and share these credentials securely.">
           <div className="space-y-6">
             <div className="rounded-lg bg-green-50 p-4">
               <p className="mb-4 text-sm text-green-800">
@@ -163,17 +193,41 @@ export default function CreateUser() {
               </p>
             </div>
 
-            <div className="text-center">
-              <p className="text-sm text-muted">Redirecting to user list...</p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => {
+                setTempPassword(null)
+                setFormData({
+                  email: '',
+                  password: '',
+                  role: 'student',
+                  first_name: '',
+                  last_name: '',
+                  middle_name: '',
+                  lrn: '',
+                  grade_level: '',
+                  strand: '',
+                  employee_id: '',
+                  phone: '',
+                  must_change_password: true,
+                  is_approved: true,
+                })
+              }}>
+                Create Another
+              </Button>
+              <Button onClick={() => navigate('/users')}>
+                Back to User List
+              </Button>
             </div>
           </div>
         </Card>
-      </div>
+        </div>
+      </PortalLayout>
     )
   }
 
   return (
-    <div className="p-8">
+    <PortalLayout>
+    <div>
       <div className="mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-8">
@@ -445,5 +499,6 @@ export default function CreateUser() {
         </form>
       </div>
     </div>
+    </PortalLayout>
   )
 }

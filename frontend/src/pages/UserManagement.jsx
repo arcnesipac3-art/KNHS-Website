@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthContext'
 import api from '../lib/api'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import PortalLayout from '../components/layout/PortalLayout'
 
 export default function UserManagement() {
+  const { user } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -18,6 +21,10 @@ export default function UserManagement() {
     students: 0,
     teachers: 0,
     staff: 0,
+  })
+  const [meta, setMeta] = useState({
+    total: 0,
+    showing: 0,
   })
 
   const roleLabels = {
@@ -51,12 +58,20 @@ export default function UserManagement() {
       if (filters.search) params.append('search', filters.search)
 
       const response = await api.get(`/users/?${params.toString()}`)
-      const userData = Array.isArray(response.data) ? response.data : []
+      const userData = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.results)
+          ? response.data.results
+          : []
       setUsers(userData)
+      setMeta({
+        total: response.data?.count ?? userData.length,
+        showing: userData.length,
+      })
 
       // Calculate stats
       setStats({
-        total: userData.length,
+        total: response.data?.count ?? userData.length,
         students: userData.filter((u) => u.role === 'student').length,
         teachers: userData.filter((u) => u.role === 'teacher').length,
         staff: userData.filter((u) =>
@@ -105,13 +120,30 @@ export default function UserManagement() {
     })
   }
 
+  if (!['admin', 'principal'].includes(user?.role)) {
+    return (
+      <PortalLayout>
+        <Card>
+          <div className="py-8 text-center">
+            <h2 className="text-lg font-semibold text-text">Access Denied</h2>
+            <p className="mt-2 text-sm text-muted">You do not have permission to manage user accounts.</p>
+          </div>
+        </Card>
+      </PortalLayout>
+    )
+  }
+
   return (
-    <div className="p-8">
+    <PortalLayout>
+      <div className="space-y-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-text">User Management</h1>
-          <p className="mt-2 text-muted">Manage student and teacher accounts</p>
+          <p className="mt-2 text-muted">Manage student, teacher, and staff accounts</p>
+          <p className="mt-1 text-xs text-muted">
+            Showing {meta.showing} of {meta.total} matching accounts
+          </p>
         </div>
         <Link to="/users/create">
           <Button>
@@ -134,7 +166,7 @@ export default function UserManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="mb-8 grid gap-6 md:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-4">
         <Card title="Total Users" subtitle={stats.total.toString()}>
           <div className="mt-2 text-xs text-muted">All active accounts</div>
         </Card>
@@ -150,7 +182,7 @@ export default function UserManagement() {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-text">Search</label>
           <input
@@ -256,6 +288,9 @@ export default function UserManagement() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
+                  Approval
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-gray-600">
                   Created
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-gray-600">
@@ -298,6 +333,17 @@ export default function UserManagement() {
                       }`}
                     >
                       {user.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                        user.is_approved
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}
+                    >
+                      {user.is_approved ? 'Approved' : 'Pending'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-muted">{formatDate(user.created_at)}</td>
@@ -352,6 +398,7 @@ export default function UserManagement() {
           </table>
         </div>
       )}
-    </div>
+      </div>
+    </PortalLayout>
   )
 }
