@@ -70,13 +70,26 @@ export default function SchoolSettingsPanel() {
     setSuccessMessage(null)
 
     try {
-      await schoolSettingsApi.update(formData)
+      // Use the id from the loaded settings object, not from formData
+      const payload = { ...formData, id: settings?.id }
+      if (!payload.id) {
+        // No settings exist yet — this shouldn't happen but guard anyway
+        setError('Settings not loaded yet. Please refresh and try again.')
+        setSaving(false)
+        return
+      }
+      await schoolSettingsApi.update(payload)
       setSuccessMessage('Settings saved successfully!')
       await loadSettings()
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       console.error('Failed to save settings:', err)
-      setError(err.response?.data?.error || 'Failed to save settings. Please try again.')
+      // React error #31: don't render objects directly — extract a string
+      const errMsg = err.response?.data?.error
+        || err.response?.data?.detail
+        || (typeof err.response?.data === 'string' ? err.response.data : null)
+        || 'Failed to save settings. Please try again.'
+      setError(errMsg)
     } finally {
       setSaving(false)
     }
