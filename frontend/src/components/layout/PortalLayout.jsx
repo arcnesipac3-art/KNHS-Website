@@ -9,6 +9,7 @@ const NAV_BY_ROLE = {
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/classes', label: 'My Classes' },
     { to: '/assignments', label: 'Assignments' },
+    { to: '/attendance', label: 'Attendance' },
     { to: '/grades', label: 'Grades' },
     { to: '/announcements', label: 'Announcements' },
   ],
@@ -50,6 +51,7 @@ const NAV_BY_ROLE = {
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/enrollment', label: 'Enrollment Queue' },
     { to: '/students', label: 'Student Records' },
+    { to: '/users', label: 'User Accounts' },
     { to: '/exports', label: 'Exports' },
   ],
   parent: [

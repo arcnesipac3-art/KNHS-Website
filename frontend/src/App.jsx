@@ -67,6 +67,10 @@ const AdminUnlockGrades = lazy(() => import('./pages/AdminUnlockGrades'))
 const ConductRatings = lazy(() => import('./pages/ConductRatings'))
 const ReportCards = lazy(() => import('./pages/ReportCards'))
 const Analytics = lazy(() => import('./pages/Analytics'))
+const AssignmentList = lazy(() => import('./pages/AssignmentList'))
+const AttendanceHistory = lazy(() => import('./pages/AttendanceHistory'))
+const GuidanceDashboard = lazy(() => import('./pages/GuidanceDashboard'))
+const RegistrarDashboard = lazy(() => import('./pages/RegistrarDashboard'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -107,20 +111,15 @@ function App() {
               <Route path="teacher-dashboard" element={<TeacherDashboard />} />
               <Route path="admin-dashboard" element={<AdminDashboard />} />
               <Route path="principal-dashboard" element={<PrincipalDashboard />} />
-              <Route path="guidance-dashboard" element={<PlaceholderPage title="Guidance Dashboard" description="Student lookup and case management coming in Phase 2." />} />
-              <Route path="registrar-dashboard" element={<PlaceholderPage title="Registrar Dashboard" description="Enrollment queue and records management coming soon." />} />
+              <Route path="guidance-dashboard" element={<GuidanceDashboard />} />
+              <Route path="registrar-dashboard" element={<RegistrarDashboard />} />
               <Route path="force-password-change" element={<ForcePasswordChange />} />
               <Route path="classes" element={<MyClasses />} />
               <Route path="classes/join" element={<JoinClass />} />
               <Route path="classes/:id" element={<ClassDetail />} />
               <Route
                 path="assignments"
-                element={
-                  <PlaceholderPage
-                    title="Assignments"
-                    description="Create, submit, and grade assignments coming in Sprint 3."
-                  />
-                }
+                element={<AssignmentList />}
               />
               <Route path="assignments/:id" element={<AssignmentDetail />} />
               <Route path="assignments/create" element={<CreateAssignment />} />
@@ -135,12 +134,7 @@ function App() {
               <Route path="analytics" element={<Analytics />} />
               <Route
                 path="attendance"
-                element={
-                  <PlaceholderPage
-                    title="Attendance"
-                    description="Daily attendance marking coming in Sprint 4."
-                  />
-                }
+                element={<AttendanceHistory />}
               />
               <Route
                 path="schedule"
