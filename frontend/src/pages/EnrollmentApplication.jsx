@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import PublicLayout from '../components/layout/PublicLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import api from '../lib/api'
@@ -133,15 +132,14 @@ export default function EnrollmentApplication() {
   const isSeniorHigh = ['11', '12'].includes(formData.grade_level)
 
   return (
-    <PublicLayout>
-      <div className="mx-auto max-w-4xl py-8">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-text">Enrollment Application</h1>
-          <p className="mt-2 text-muted">
-            School Year 2026-2027 · Kiwalan National High School
-          </p>
-        </div>
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      {/* Header */}
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold text-text">Enrollment Application</h1>
+        <p className="mt-2 text-muted">
+          School Year 2026-2027 · Kiwalan National High School
+        </p>
+      </div>
 
         {/* Info Alert */}
         <Card className="mb-6 border-l-4 border-l-knhs-purple bg-purple-50">
@@ -591,7 +589,6 @@ export default function EnrollmentApplication() {
             </Button>
           </div>
         </form>
-      </div>
-    </PublicLayout>
+    </div>
   )
 }

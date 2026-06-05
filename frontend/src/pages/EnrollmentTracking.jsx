@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import PublicLayout from '../components/layout/PublicLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import api from '../lib/api'
@@ -50,7 +49,7 @@ export default function EnrollmentTracking() {
   }
 
   return (
-    <PublicLayout>
+    
       <div className="mx-auto max-w-3xl py-8">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -288,7 +287,7 @@ export default function EnrollmentTracking() {
           </Card>
         )}
       </div>
-    </PublicLayout>
+    
   )
 }
 
@@ -381,3 +380,4 @@ function formatDate(dateString) {
     minute: '2-digit',
   })
 }
+
