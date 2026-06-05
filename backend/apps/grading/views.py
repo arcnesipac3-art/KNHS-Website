@@ -8,12 +8,13 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.academics.models import ClassEnrollment, ClassSubject, Quarter
+from apps.academics.models import ClassEnrollment, ClassSubject, Quarter, AcademicYear
 from apps.academics.permissions import IsAdminOrPrincipal, IsAdminUser, IsTeacherUser
 from apps.communications.models import Notification
 from .models import Grade, GradePublishEvent, ConductRating
 from .pagination import GradePagination
 from .reports import SF9Generator
+from .sf9_generator import SF9Generator as NewSF9Generator, generate_class_sf9_batch
 from .serializers import (
     GradeSerializer,
     GradeInputSerializer,
@@ -532,6 +533,108 @@ class GradeViewSet(viewsets.ModelViewSet):
             "description": "DepEd Transmutation Table (Initial Grade → Transmuted Grade)",
             "passing_grade": 75,
             "grade_range": {"min": 60, "max": 100}
+        })
+
+    @action(detail=False, methods=["get"])
+    def generate_sf9_data(self, request):
+        """Generate SF9 JSON data for a student (new format)."""
+        student_id = request.query_params.get('student')
+        academic_year_id = request.query_params.get('academic_year')
+        
+        if not student_id or not academic_year_id:
+            return Response(
+                {'error': 'student and academic_year parameters are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from apps.accounts.models import User
+            student = User.objects.get(id=student_id, role='student')
+            academic_year = AcademicYear.objects.get(id=academic_year_id)
+        except (User.DoesNotExist, AcademicYear.DoesNotExist):
+            return Response(
+                {'error': 'Invalid student or academic year ID'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permissions
+        if request.user.role == 'student' and str(request.user.id) != student_id:
+            return Response(
+                {'error': 'You can only view your own SF9'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        generator = NewSF9Generator(student, academic_year)
+        sf9_data = generator.get_sf9_data()
+        
+        return Response(sf9_data)
+    
+    @action(detail=False, methods=["get"])
+    def download_sf9(self, request):
+        """Download SF9 PDF for a student (new format)."""
+        student_id = request.query_params.get('student')
+        academic_year_id = request.query_params.get('academic_year')
+        
+        if not student_id or not academic_year_id:
+            return Response(
+                {'error': 'student and academic_year parameters are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from apps.accounts.models import User
+            from django.http import FileResponse
+            student = User.objects.get(id=student_id, role='student')
+            academic_year = AcademicYear.objects.get(id=academic_year_id)
+        except (User.DoesNotExist, AcademicYear.DoesNotExist):
+            return Response(
+                {'error': 'Invalid student or academic year ID'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permissions
+        if request.user.role == 'student' and str(request.user.id) != student_id:
+            return Response(
+                {'error': 'You can only download your own SF9'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        generator = NewSF9Generator(student, academic_year)
+        pdf_buffer = generator.generate_pdf()
+        
+        filename = f"SF9_{student.profile.lrn}_{academic_year.name.replace('/', '-')}.pdf"
+        
+        return FileResponse(
+            pdf_buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type='application/pdf'
+        )
+    
+    @action(detail=False, methods=["get"])
+    def class_sf9_batch(self, request):
+        """Generate SF9 data for all students in a class."""
+        classroom_id = request.query_params.get('classroom')
+        academic_year_id = request.query_params.get('academic_year')
+        
+        if not classroom_id or not academic_year_id:
+            return Response(
+                {'error': 'classroom and academic_year parameters are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check permissions - only teachers and admins
+        if request.user.role not in ['teacher', 'admin', 'principal']:
+            return Response(
+                {'error': 'Only teachers and admins can generate class SF9 reports'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        sf9_data_list = generate_class_sf9_batch(classroom_id, academic_year_id)
+        
+        return Response({
+            'count': len(sf9_data_list),
+            'students': sf9_data_list
         })
 
     @action(detail=False, methods=["get"])

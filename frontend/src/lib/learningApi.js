@@ -171,6 +171,29 @@ export const gradeApi = {
    * Get grouped approval queue for principals/admins
    */
   getApprovalQueue: (filters = {}) => api.get('/grades/approval_queue/', { params: filters }),
+
+  /**
+   * Generate SF9 JSON data for a student
+   * @param {Object} params - { student, academic_year }
+   */
+  generateSF9Data: (params) => api.get('/grades/generate_sf9_data/', { params }),
+
+  /**
+   * Download SF9 PDF for a student
+   * @param {Object} params - { student, academic_year }
+   * @returns {Promise} - Returns blob response
+   */
+  downloadSF9PDF: (params) => 
+    api.get('/grades/download_sf9/', {
+      params,
+      responseType: 'blob'
+    }),
+
+  /**
+   * Generate SF9 data for all students in a class
+   * @param {Object} params - { classroom, academic_year }
+   */
+  getClassSF9Batch: (params) => api.get('/grades/class_sf9_batch/', { params }),
 }
 
 // ============================================================================
