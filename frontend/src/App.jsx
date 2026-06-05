@@ -52,6 +52,7 @@ const ApprovalCenter = lazy(() => import('./pages/ApprovalCenter'))
 const AdminUnlockGrades = lazy(() => import('./pages/AdminUnlockGrades'))
 const ConductRatings = lazy(() => import('./pages/ConductRatings'))
 const ReportCards = lazy(() => import('./pages/ReportCards'))
+const Analytics = lazy(() => import('./pages/Analytics'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -116,6 +117,7 @@ function App() {
               <Route path="grades/conduct" element={<ConductRatings />} />
               <Route path="grades" element={<StudentGrades />} />
               <Route path="report-cards" element={<ReportCards />} />
+              <Route path="analytics" element={<Analytics />} />
               <Route
                 path="attendance"
                 element={
