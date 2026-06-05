@@ -33,6 +33,7 @@ const NAV_BY_ROLE = {
     { to: '/approvals', label: 'Approval Center' },
     { to: '/announcements', label: 'Announcements' },
     { to: '/reports', label: 'Reports' },
+    { to: '/settings', label: 'Settings' },
   ],
   guidance: [
     { to: '/dashboard', label: 'Dashboard' },
