@@ -22,7 +22,14 @@ export default function AdminDashboard() {
         ])
         console.log('📊 Dashboard data loaded:', { yearData, dashboardData: dashboardData.data })
         setAcademicYear(yearData)
-        setStats(dashboardData.data?.widgets?.kpis || {})
+        // Map the new flat dashboard response to the KPI keys the UI expects
+        const d = dashboardData.data
+        setStats({
+          total_students: d?.users?.active_students ?? 0,
+          total_teachers: d?.users?.active_teachers ?? 0,
+          total_classrooms: 0,
+          pending_enrollments: d?.grades?.pending_approvals ?? 0,
+        })
       } catch (error) {
         console.error('Failed to load dashboard:', error)
       } finally {

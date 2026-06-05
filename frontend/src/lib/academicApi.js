@@ -276,14 +276,18 @@ export const academicCalendarApi = {
  * Get current academic year and its quarters
  */
 export async function getCurrentAcademicYearWithQuarters() {
-  const { data: years } = await academicYearApi.getAll()
+  const { data: yearsData } = await academicYearApi.getAll()
+  // Handle both paginated { results: [...] } and plain array responses
+  const years = Array.isArray(yearsData) ? yearsData : (yearsData?.results ?? [])
   const currentYear = years.find((y) => y.is_current)
 
   if (!currentYear) {
     return { academicYear: null, quarters: [] }
   }
 
-  const { data: quarters } = await quarterApi.getAll(currentYear.id)
+  const { data: quartersData } = await quarterApi.getAll(currentYear.id)
+  // Handle both paginated and plain array responses
+  const quarters = Array.isArray(quartersData) ? quartersData : (quartersData?.results ?? [])
 
   return {
     academicYear: currentYear,
@@ -296,7 +300,8 @@ export async function getCurrentAcademicYearWithQuarters() {
  */
 export async function getMyClasses() {
   const { data } = await classroomApi.getAll()
-  return data
+  // Handle both paginated { results: [...] } and plain array responses
+  return Array.isArray(data) ? data : (data?.results ?? [])
 }
 
 /**
@@ -308,7 +313,7 @@ export async function getSubjectsForGrade(gradeLevel, strand = '') {
     filters.strand = strand
   }
   const { data } = await subjectApi.getAll(filters)
-  return data
+  return Array.isArray(data) ? data : (data?.results ?? [])
 }
 
 /**
@@ -321,9 +326,12 @@ export async function getClassroomDetails(classroomId) {
     classroomApi.getEnrollments(classroomId, 'active'),
   ])
 
+  const subjectsData = subjectsResponse.data
+  const enrollmentsData = enrollmentsResponse.data
+
   return {
     classroom: classroomResponse.data,
-    subjects: subjectsResponse.data,
-    enrollments: enrollmentsResponse.data,
+    subjects: Array.isArray(subjectsData) ? subjectsData : (subjectsData?.results ?? []),
+    enrollments: Array.isArray(enrollmentsData) ? enrollmentsData : (enrollmentsData?.results ?? []),
   }
 }
