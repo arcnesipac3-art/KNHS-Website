@@ -286,3 +286,62 @@ If issues persist after deployment:
 2. Check Vercel logs: https://vercel.com/dashboard
 3. Verify deployment status shows "Live" (Render) and "Ready" (Vercel)
 4. Hard refresh browser (Ctrl+Shift+R) to clear cache
+
+
+---
+
+## Additional Fix: Password Change Issue
+
+### Issue
+After creating a new user with `must_change_password=true`, the forced password change flow was failing with:
+```
+POST /api/v1/auth/change-password/ 400 (Bad Request)
+Unable to update password.
+```
+
+### Root Cause
+**Field name mismatch** between frontend and backend:
+
+**ForcePasswordChange.jsx (Frontend):**
+```javascript
+await api.post('/auth/change-password/', {
+  current_password: currentPassword,  // ❌ Wrong field name
+  new_password: newPassword,
+})
+```
+
+**ChangePasswordSerializer (Backend):**
+```python
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)  # Expected field name
+    new_password = serializers.CharField(write_only=True, min_length=8)
+```
+
+### Solution Applied ✅
+
+**File:** `frontend/src/pages/ForcePasswordChange.jsx`
+
+```javascript
+// FIXED:
+await api.post('/auth/change-password/', {
+  old_password: currentPassword,  // ✅ Correct field name
+  new_password: newPassword,
+})
+```
+
+### Note
+The regular password change page (`ChangePassword.jsx`) was already using the correct field name `old_password`. Only the forced password change flow was affected.
+
+### Commit
+```bash
+commit 0fd17a7
+fix: correct password change field name from current_password to old_password
+```
+
+### Testing
+Once deployed, test the flow:
+1. Create a new user with `must_change_password=true`
+2. Share the temporary password with the user
+3. User logs in → Should be redirected to Force Password Change page
+4. User enters current (temporary) password and new password
+5. Should successfully update password and redirect to dashboard
