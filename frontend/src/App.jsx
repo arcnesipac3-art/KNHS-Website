@@ -36,6 +36,9 @@ import NotificationSettings from './pages/NotificationSettings'
 import EnrollmentApplication from './pages/EnrollmentApplication'
 import EnrollmentTracking from './pages/EnrollmentTracking'
 import EnrollmentManagement from './pages/EnrollmentManagement'
+import UserManagement from './pages/UserManagement'
+import CreateUser from './pages/CreateUser'
+import EditUser from './pages/EditUser'
 
 const queryClient = new QueryClient()
 
@@ -142,6 +145,18 @@ function App() {
               <Route
                 path="enrollment"
                 element={<EnrollmentManagement />}
+              />
+              <Route
+                path="users"
+                element={<UserManagement />}
+              />
+              <Route
+                path="users/create"
+                element={<CreateUser />}
+              />
+              <Route
+                path="users/:id/edit"
+                element={<EditUser />}
               />
               <Route
                 path="settings"

@@ -1,0 +1,423 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api from '../lib/api'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+
+export default function CreateUser() {
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [tempPassword, setTempPassword] = useState(null)
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    role: 'student',
+    first_name: '',
+    last_name: '',
+    middle_name: '',
+    lrn: '',
+    grade_level: '',
+    strand: '',
+    employee_id: '',
+    phone: '',
+    must_change_password: true,
+    is_approved: true,
+  })
+
+  const roleLabels = {
+    student: 'Student',
+    teacher: 'Teacher',
+    admin: 'School Administrator',
+    principal: 'Principal',
+    guidance: 'Guidance Office',
+    registrar: 'Registrar',
+  }
+
+  const strands = ['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL-ICT', 'TVL-HE']
+  const gradeLevels = [7, 8, 9, 10, 11, 12]
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value,
+    })
+  }
+
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    let password = ''
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setFormData({ ...formData, password })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      // Prepare data
+      const data = {
+        email: formData.email.toLowerCase(),
+        password: formData.password,
+        role: formData.role,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        middle_name: formData.middle_name,
+        must_change_password: formData.must_change_password,
+        is_approved: formData.is_approved,
+      }
+
+      // Add role-specific fields
+      if (formData.role === 'student') {
+        data.lrn = formData.lrn
+        data.grade_level = parseInt(formData.grade_level)
+        if (formData.strand) data.strand = formData.strand
+      } else if (formData.role === 'teacher') {
+        data.employee_id = formData.employee_id
+      }
+
+      if (formData.phone) data.phone = formData.phone
+
+      const response = await api.post('/api/v1/users/', data)
+      
+      // Show temporary password before navigating
+      setTempPassword(formData.password)
+      
+      // Wait a moment then navigate
+      setTimeout(() => {
+        navigate('/users')
+      }, 3000)
+    } catch (err) {
+      console.error('Failed to create user:', err)
+      if (err.response?.data) {
+        const errors = err.response.data
+        const errorMessages = Object.entries(errors)
+          .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+          .join('\n')
+        setError(errorMessages || 'Failed to create user. Please check the form.')
+      } else {
+        setError('Failed to create user. Please try again.')
+      }
+      setLoading(false)
+    }
+  }
+
+  const isStudent = formData.role === 'student'
+  const isTeacher = formData.role === 'teacher'
+
+  if (tempPassword) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-8">
+        <Card title="User Created Successfully!" subtitle="Important: Save this information">
+          <div className="space-y-6">
+            <div className="rounded-lg bg-green-50 p-4">
+              <p className="mb-4 text-sm text-green-800">
+                The user account has been created. Please share these credentials securely:
+              </p>
+              <div className="space-y-2 rounded bg-white p-4">
+                <div>
+                  <span className="text-xs font-medium text-gray-600">Email:</span>
+                  <p className="font-mono text-sm font-medium text-text">{formData.email}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-gray-600">Temporary Password:</span>
+                  <p className="font-mono text-sm font-medium text-text">{tempPassword}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-yellow-50 p-4">
+              <p className="text-xs font-medium text-yellow-800">
+                ⚠️ The user must change this password on their first login.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm text-muted">Redirecting to user list...</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-8">
+      <div className="mx-auto max-w-3xl">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-text">Create New User</h1>
+          <p className="mt-2 text-muted">Add a new student, teacher, or staff account</p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-6">
+            {/* Account Information */}
+            <Card title="Account Information" subtitle="Login credentials and role">
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="user@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text">
+                    Role <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="role"
+                    required
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                    value={formData.role}
+                    onChange={handleChange}
+                  >
+                    {Object.entries(roleLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text">
+                    Temporary Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="password"
+                      required
+                      minLength={8}
+                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Min 8 characters"
+                    />
+                    <Button type="button" variant="outline" onClick={generatePassword}>
+                      Generate
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    User will be required to change this password on first login
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="must_change_password"
+                    name="must_change_password"
+                    checked={formData.must_change_password}
+                    onChange={handleChange}
+                    className="h-4 w-4 rounded border-gray-300 text-knhs-purple focus:ring-knhs-purple"
+                  />
+                  <label htmlFor="must_change_password" className="text-sm text-text">
+                    Force password change on first login
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="is_approved"
+                    name="is_approved"
+                    checked={formData.is_approved}
+                    onChange={handleChange}
+                    className="h-4 w-4 rounded border-gray-300 text-knhs-purple focus:ring-knhs-purple"
+                  />
+                  <label htmlFor="is_approved" className="text-sm text-text">
+                    Account approved (active immediately)
+                  </label>
+                </div>
+              </div>
+            </Card>
+
+            {/* Personal Information */}
+            <Card title="Personal Information" subtitle="User's name and contact">
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-text">
+                      First Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="first_name"
+                      required
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                      value={formData.first_name}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-text">
+                      Last Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="last_name"
+                      required
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                      value={formData.last_name}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text">Middle Name</label>
+                  <input
+                    type="text"
+                    name="middle_name"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                    value={formData.middle_name}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text">Phone Number</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="09XX XXX XXXX"
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Student-specific fields */}
+            {isStudent && (
+              <Card title="Student Information" subtitle="Academic details for students">
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-text">
+                      Learner Reference Number (LRN) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="lrn"
+                      required={isStudent}
+                      maxLength={12}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                      value={formData.lrn}
+                      onChange={handleChange}
+                      placeholder="12-digit LRN"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-text">
+                        Grade Level <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="grade_level"
+                        required={isStudent}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                        value={formData.grade_level}
+                        onChange={handleChange}
+                      >
+                        <option value="">Select grade level</option>
+                        {gradeLevels.map((level) => (
+                          <option key={level} value={level}>
+                            Grade {level}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-text">
+                        Strand {parseInt(formData.grade_level) >= 11 && <span className="text-red-500">*</span>}
+                      </label>
+                      <select
+                        name="strand"
+                        required={parseInt(formData.grade_level) >= 11}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                        value={formData.strand}
+                        onChange={handleChange}
+                        disabled={parseInt(formData.grade_level) < 11}
+                      >
+                        <option value="">Select strand</option>
+                        {strands.map((strand) => (
+                          <option key={strand} value={strand}>
+                            {strand}
+                          </option>
+                        ))}
+                      </select>
+                      {parseInt(formData.grade_level) < 11 && (
+                        <p className="mt-1 text-xs text-muted">Strand is for SHS (Grade 11-12) only</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Teacher-specific fields */}
+            {isTeacher && (
+              <Card title="Teacher Information" subtitle="Employment details">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text">
+                    Employee ID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="employee_id"
+                    required={isTeacher}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                    value={formData.employee_id}
+                    onChange={handleChange}
+                    placeholder="e.g., TCH-2026-001"
+                  />
+                </div>
+              </Card>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <p className="whitespace-pre-line text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/users')}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Creating...' : 'Create User'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

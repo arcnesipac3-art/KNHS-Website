@@ -66,8 +66,8 @@ export default function AdminDashboard() {
 
         {/* Quick Actions */}
         <div className="flex flex-wrap gap-3">
-          <Link to="/people">
-            <Button>Manage Users</Button>
+          <Link to="/users">
+            <Button>User Management</Button>
           </Link>
           <Link to="/enrollment">
             <Button variant="secondary">Enrollment Queue</Button>
