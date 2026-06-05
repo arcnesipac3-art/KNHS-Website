@@ -55,7 +55,7 @@ export default function AdminDashboard() {
         {/* Welcome Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-knhs-purple to-purple-700 p-6 text-white shadow-lg">
           <p className="text-sm opacity-90">School Administrator</p>
-          <h1 className="text-3xl font-bold">{user?.profile?.full_name || user?.email}</h1>
+          <h1 className="text-3xl font-bold">{user?.display_name || user?.email}</h1>
           <p className="mt-1 text-purple-100">System Management & Configuration</p>
           {currentQuarter && academicYear?.academicYear && (
             <p className="mt-2 text-sm text-purple-200">

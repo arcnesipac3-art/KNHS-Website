@@ -12,7 +12,7 @@ export default function RegistrarDashboard() {
       <div className="space-y-8">
         <div className="rounded-2xl bg-gradient-to-r from-knhs-purple to-purple-700 p-6 text-white shadow-lg">
           <p className="text-sm opacity-90">Registrar Office</p>
-          <h1 className="text-3xl font-bold">{user?.profile?.full_name || user?.email}</h1>
+          <h1 className="text-3xl font-bold">{user?.display_name || user?.email}</h1>
           <p className="mt-1 text-purple-100">Records management • Enrollment pipeline</p>
         </div>
 

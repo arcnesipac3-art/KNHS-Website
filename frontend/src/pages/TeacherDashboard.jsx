@@ -54,8 +54,8 @@ export default function TeacherDashboard() {
         {/* Welcome Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-knhs-purple to-purple-700 p-6 text-white shadow-lg">
           <p className="text-sm opacity-90">Welcome back,</p>
-          <h1 className="text-3xl font-bold">{user?.profile?.full_name || user?.email}</h1>
-          <p className="mt-1 text-purple-100">Teacher • {user?.profile?.employee_id || 'Faculty'}</p>
+          <h1 className="text-3xl font-bold">{user?.display_name || user?.email}</h1>
+          <p className="mt-1 text-purple-100">Teacher • {user?.employee_id || 'Faculty'}</p>
           {currentQuarter && (
             <p className="mt-2 text-sm text-purple-200">
               {academicYear.academicYear.label} • {currentQuarter.name}

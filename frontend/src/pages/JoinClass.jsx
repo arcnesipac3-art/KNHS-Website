@@ -218,10 +218,10 @@ export default function JoinClass() {
             <div>
               <p className="text-sm font-medium text-text">Joining as:</p>
               <p className="mt-1 text-lg font-semibold text-knhs-purple">
-                {user?.profile?.full_name || user?.email}
+                {user?.display_name || user?.email}
               </p>
               <p className="text-xs text-muted">
-                Grade {user?.profile?.grade_level} {user?.profile?.strand && `• ${user?.profile?.strand}`}
+                Grade {user?.grade_level} {user?.strand && `• ${user?.strand}`}
               </p>
             </div>
             <div className="rounded-full bg-purple-100 p-3">

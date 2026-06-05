@@ -53,9 +53,9 @@ export default function StudentDashboard() {
       <div className="space-y-8">{/* Welcome Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-knhs-purple to-purple-700 p-6 text-white shadow-lg">
           <p className="text-sm opacity-90">Welcome back,</p>
-          <h1 className="text-3xl font-bold">{user?.profile?.full_name || user?.email}</h1>
+          <h1 className="text-3xl font-bold">{user?.display_name || user?.email}</h1>
           <p className="mt-1 text-purple-100">
-            Grade {user?.profile?.grade_level} {user?.profile?.strand && `• ${user?.profile?.strand}`}
+            Grade {user?.grade_level} {user?.strand && `• ${user?.strand}`}
           </p>
           {currentQuarter && (
             <p className="mt-2 text-sm text-purple-200">
