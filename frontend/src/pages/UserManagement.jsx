@@ -51,15 +51,15 @@ export default function UserManagement() {
       if (filters.search) params.append('search', filters.search)
 
       const response = await api.get(`/users/?${params.toString()}`)
-      setUsers(response.data)
+      const userData = Array.isArray(response.data) ? response.data : []
+      setUsers(userData)
 
       // Calculate stats
-      const allUsers = response.data
       setStats({
-        total: allUsers.length,
-        students: allUsers.filter((u) => u.role === 'student').length,
-        teachers: allUsers.filter((u) => u.role === 'teacher').length,
-        staff: allUsers.filter((u) =>
+        total: userData.length,
+        students: userData.filter((u) => u.role === 'student').length,
+        teachers: userData.filter((u) => u.role === 'teacher').length,
+        staff: userData.filter((u) =>
           ['admin', 'principal', 'guidance', 'registrar'].includes(u.role)
         ).length,
       })
