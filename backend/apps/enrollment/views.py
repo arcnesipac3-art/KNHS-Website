@@ -1,4 +1,5 @@
 from django.utils import timezone
+import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -157,10 +158,13 @@ class EnrollmentApplicationViewSet(viewsets.ModelViewSet):
         )
         
         # Send email notification to applicant (Asynchronously)
-        if hasattr(application, 'email') or 'email' in application.applicant_data:
-            email = application.applicant_data.get('email')
+        try:
+            email = application.applicant_data.get('contact', {}).get('email')
             if email:
                 send_enrollment_status_email(application.id, new_status, email)
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not send enrollment status email: {e}")
         
         # Log system event for audit
         log_system_event(

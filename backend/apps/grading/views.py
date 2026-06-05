@@ -955,7 +955,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             "grade_level": enrollment.classroom.grade_level,
             "section": enrollment.classroom.section,
             "academic_year": enrollment.classroom.academic_year.label,
-            "sex": getattr(enrollment.student.profile, 'sex', 'N/A'),
+            "sex": getattr(enrollment.student.profile, 'sex', ''),
         }
 
         # 2. Fetch Grades

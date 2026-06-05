@@ -160,19 +160,25 @@ class EnrollmentApplicationTrackingSerializer(serializers.ModelSerializer):
     """
     Serializer for tracking applications (public endpoint - limited info)
     """
+    applicant_name = serializers.ReadOnlyField()
+    applicant_email = serializers.ReadOnlyField()
+    applicant_phone = serializers.ReadOnlyField()
+    applicant_lrn = serializers.ReadOnlyField()
+
     class Meta:
         model = EnrollmentApplication
         fields = [
             'id',
             'tracking_number',
-            'applicant_data',
+            'applicant_name',
+            'applicant_email',
+            'applicant_phone',
+            'applicant_lrn',
             'grade_level',
             'strand',
             'status',
-            'reviewer_notes',
             'submitted_at',
             'reviewed_at',
-            'updated_at',
         ]
         read_only_fields = fields
 

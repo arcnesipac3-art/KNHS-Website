@@ -10,7 +10,12 @@ from django.utils import timezone
 
 def generate_join_code():
     """Generate a unique 6-character alphanumeric join code."""
-    return "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    max_attempts = 10
+    for _ in range(max_attempts):
+        code = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+        if not Classroom.objects.filter(join_code=code).exists():
+            return code
+    return "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 
 
 class AcademicYear(models.Model):
@@ -169,8 +174,16 @@ class Classroom(models.Model):
         return self.enrollment_count >= self.capacity
 
     def regenerate_join_code(self):
-        """Generate a new join code."""
-        self.join_code = generate_join_code()
+        """Generate a new join code with collision check."""
+        max_attempts = 5
+        for _ in range(max_attempts):
+            new_code = generate_join_code()
+            if not Classroom.objects.filter(join_code=new_code).exists():
+                self.join_code = new_code
+                self.save(update_fields=["join_code", "updated_at"])
+                return
+        # Fallback: force regenerate with unique suffix
+        self.join_code = generate_join_code() + str(uuid.uuid4())[:2]
         self.save(update_fields=["join_code", "updated_at"])
 
 

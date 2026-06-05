@@ -79,6 +79,7 @@ class UserProfile(models.Model):
     employee_id = models.CharField(max_length=50, blank=True)
     phone = models.CharField(max_length=20, blank=True)
     avatar_url = models.URLField(blank=True)
+    sex = models.CharField(max_length=1, blank=True, help_text="M or F")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

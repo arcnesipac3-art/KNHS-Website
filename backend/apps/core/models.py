@@ -11,7 +11,7 @@ class SchoolSettings(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
     # Branding
-    school_name = models.CharField(max_length=200, default="Kalangitan National High School")
+    school_name = models.CharField(max_length=200, default="Kiwalan National High School")
     school_short_name = models.CharField(max_length=50, default="KNHS")
     school_logo_url = models.URLField(blank=True, help_text="URL to school logo image")
     primary_color = models.CharField(

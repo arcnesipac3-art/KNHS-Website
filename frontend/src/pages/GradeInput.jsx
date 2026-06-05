@@ -116,11 +116,97 @@ export default function GradeInput() {
         // Map grades to enrollment IDs
         const gradesMap = {}
         gradesData.forEach((grade) => {
-          gradesMap[grade.enrollment_id] = {
+          gradesMap[grade.class_enrollment] = {
             id: grade.id,
-            ww: grade.ww || '',
-            pt: grade.pt || '',
-            qa: grade.qa || '',
+            ww: grade.ww_score || '',
+            pt: grade.pt_score || '',
+            qa: grade.qa_score || '',
+            transmuted: grade.transmuted_grade || '',
+            status: grade.status || 'draft',
+          }
+        })
+
+        // Initialize empty grades for students without records
+        enrollmentsData.forEach((enrollment) => {
+          if (!gradesMap[enrollment.id]) {
+            gradesMap[enrollment.id] = {
+              id: null,
+              ww: '',
+              pt: '',
+              qa: '',
+              transmuted: '',
+              status: 'draft',
+            }
+          }
+        })
+
+        setGrades(gradesMap)
+      } catch (err) {
+        console.error('Failed to load grades:', err)
+        setError('Failed to load grade data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadGradesData()
+  }, [selectedClassroom, selectedQuarter, selectedSubject])
+
+  function handleGradeChange(enrollmentId, component, value) {
+    // Allow only numbers and decimals
+    if (value && !/^\d*\.?\d*$/.test(value)) {
+      return
+    }
+
+    setGrades((prev) => {
+      const updated = {
+        ...prev,
+        [enrollmentId]: {
+          ...prev[enrollmentId],
+          [component]: value,
+        },
+      }
+
+      // Auto-calculate transmuted grade if all components are filled
+      const grade = updated[enrollmentId]
+      if (grade.ww && grade.pt && grade.qa) {
+        const initial = calculateInitialGrade(
+          parseFloat(grade.ww),
+          parseFloat(grade.pt),
+          parseFloat(grade.qa)
+        )
+        grade.transmuted = transmuteGrade(initial)
+      } else {
+        grade.transmuted = ''
+      }
+
+      return updated
+    })
+  }
+
+      setLoading(true)
+      setError(null)
+      setSuccessMessage(null)
+
+      try {
+        // Load enrollments
+        const { data: enrollmentsData } = await classroomApi.getEnrollments(selectedClassroom, 'active')
+        setEnrollments(enrollmentsData)
+
+        // Load existing grades
+        const { data: gradesData } = await gradeApi.getAll({
+          class_subject: selectedSubject,
+          quarter: selectedQuarter,
+        })
+
+        // Map grades to enrollment IDs
+        const gradesMap = {}
+        gradesData.forEach((grade) => {
+          gradesMap[grade.class_enrollment] = {
+            id: grade.id,
+            ww: grade.ww_score || '',
+            pt: grade.pt_score || '',
+            qa: grade.qa_score || '',
             transmuted: grade.transmuted_grade || '',
             status: grade.status || 'draft',
           }
@@ -296,11 +382,11 @@ export default function GradeInput() {
 
       const gradesMap = {}
       gradesData.forEach((grade) => {
-        gradesMap[grade.enrollment_id] = {
+        gradesMap[grade.class_enrollment] = {
           id: grade.id,
-          ww: grade.ww || '',
-          pt: grade.pt || '',
-          qa: grade.qa || '',
+          ww: grade.ww_score || '',
+          pt: grade.pt_score || '',
+          qa: grade.qa_score || '',
           transmuted: grade.transmuted_grade || '',
           status: grade.status || 'draft',
         }
@@ -357,11 +443,11 @@ export default function GradeInput() {
 
       const gradesMap = {}
       gradesData.forEach((grade) => {
-        gradesMap[grade.enrollment_id] = {
+        gradesMap[grade.class_enrollment] = {
           id: grade.id,
-          ww: grade.ww || '',
-          pt: grade.pt || '',
-          qa: grade.qa || '',
+          ww: grade.ww_score || '',
+          pt: grade.pt_score || '',
+          qa: grade.qa_score || '',
           transmuted: grade.transmuted_grade || '',
           status: grade.status || 'draft',
         }
