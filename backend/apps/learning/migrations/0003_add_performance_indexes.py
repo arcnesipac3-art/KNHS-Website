@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('learning', '0002_submission_graded_at_alter_assignment_class_subject'),
+        ('learning', '0001_initial'),
     ]
 
     operations = [
