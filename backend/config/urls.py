@@ -9,5 +9,6 @@ urlpatterns = [
     path("api/v1/", include("apps.grading.urls")),
     path("api/v1/", include("apps.attendance.urls")),
     path("api/v1/", include("apps.communications.urls")),
+    path("api/v1/", include("apps.enrollment.urls")),
     path("api/v1/", include("apps.system.urls")),
 ]

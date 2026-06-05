@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.grading",
     "apps.attendance",
     "apps.communications",
+    "apps.enrollment",
     "apps.system",
 ]
 

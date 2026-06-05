@@ -62,3 +62,14 @@ class IsAdviserOfClass(permissions.BasePermission):
             return obj.classroom.adviser == request.user
 
         return False
+
+
+class IsAdminOrRegistrar(permissions.BasePermission):
+    """Allow access only to admin or registrar users."""
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ["admin", "registrar"]
+        )
