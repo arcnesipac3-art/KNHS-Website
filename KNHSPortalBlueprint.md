@@ -1893,4 +1893,56 @@ If migrating data from `AI-made Website` prototype:
 
 ---
 
-**Blueprint status: COMPLETE** — 34 sections covering vision through implementation-ready specifications. Ready for Phase 1 execution upon approval.
+---
+
+## 35. Phase 1 Refinements (Post-Audit)
+
+### 35.1 Standardized Route Refinements
+Following a comprehensive audit, all Phase 1 routes have been refined with the following security and performance enhancements:
+
+| Feature | Implementation | Target Routes |
+|---------|----------------|---------------|
+| **Rate Limiting** | `ScopedRateThrottle` (sensitive: 5/min) | Login, Enrollment Apply, Tracking |
+| **Standardized Errors** | Custom `exception_handler` with consistent JSON envelope | All API Endpoints |
+| **Async Processing** | Thread-based background tasks (Simulated Celery) | Enrollment Emails, Audit Logging |
+| **Unified Logging** | `log_system_event` utility | Critical Mutations, Auth Failures |
+
+### 35.2 End-to-End Workflow Integration Map
+The following table maps user-facing routes to their cross-system integration points:
+
+| Workflow | Frontend Route | Backend Integration | Data/Storage |
+|----------|----------------|---------------------|--------------|
+| **Enrollment** | `/enrollment/apply` | `EnrollmentApplicationViewSet.create` | PG (Apps), Storage (Docs) |
+| **Grading** | `/grades/input` | `GradeViewSet.batch_input` | PG (Grades), Audit Logs |
+| **Auth** | `/login` | `LoginView.post` | JWT, Cookies, User DB |
+| **Attendance** | `/attendance/mark` | `AttendanceRecordViewSet.bulk_mark` | PG (Attendance) |
+
+### 35.3 Refined Route Schemas (Examples)
+
+#### Standard Error Response
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Invalid input provided.",
+    "details": {
+      "email": ["Enter a valid email address."]
+    }
+  }
+}
+```
+
+#### Enrollment Workflow Refinement
+- **Before**: Synchronous email attempt, no rate limiting.
+- **After**: Asynchronous email dispatch via `send_enrollment_status_email`, `sensitive` throttle applied to prevent spam.
+
+### 35.4 Test Results Summary (Validation)
+- [x] **Rate Limit Test**: Verified 429 status after 5 rapid login attempts.
+- [x] **Error Format Test**: Verified all 400/404/500 errors follow the new standard envelope.
+- [x] **Async Integration Test**: Verified (via logs) that email tasks run in background threads without blocking API response.
+- [x] **RBAC Validation**: Verified role-based access to Teacher/Admin specific routes.
+
+---
+
+**Blueprint status: REFINED (PHASE 1)** — Updated with production-grade security and integration patterns.
+

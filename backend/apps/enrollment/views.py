@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from .models import EnrollmentApplication, EnrollmentStatusHistory
 from .serializers import (
     EnrollmentApplicationSerializer,
@@ -11,6 +12,7 @@ from .serializers import (
     EnrollmentApplicationReviewSerializer,
 )
 from apps.academics.permissions import IsAdminOrRegistrar
+from apps.system.tasks import send_enrollment_status_email, log_system_event
 
 
 class EnrollmentApplicationViewSet(viewsets.ModelViewSet):
@@ -28,6 +30,8 @@ class EnrollmentApplicationViewSet(viewsets.ModelViewSet):
     """
     queryset = EnrollmentApplication.objects.all()
     serializer_class = EnrollmentApplicationSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "sensitive"
     
     def get_permissions(self):
         """
@@ -152,8 +156,18 @@ class EnrollmentApplicationViewSet(viewsets.ModelViewSet):
             notes=reviewer_notes
         )
         
-        # TODO: Send email notification to applicant
-        # send_enrollment_status_email(application)
+        # Send email notification to applicant (Asynchronously)
+        if hasattr(application, 'email') or 'email' in application.applicant_data:
+            email = application.applicant_data.get('email')
+            if email:
+                send_enrollment_status_email(application.id, new_status, email)
+        
+        # Log system event for audit
+        log_system_event(
+            "ENROLLMENT_REVIEW",
+            f"Application {application.tracking_number} status changed from {old_status} to {new_status}",
+            request.user.id
+        )
         
         response_serializer = EnrollmentApplicationSerializer(application)
         return Response({
