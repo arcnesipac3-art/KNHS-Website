@@ -4,6 +4,7 @@ import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import SchoolSettingsPanelComponent from '../components/settings/SchoolSettingsPanel'
 
 const BASE_TABS = [
   {
@@ -210,36 +211,7 @@ function PreferencesPanel() {
 }
 
 function SchoolSettingsPanel() {
-  return (
-    <div className="space-y-4">
-      <InfoBlock
-        title="Admin-only school settings"
-        description="This section matches the blueprint-reserved administrative settings area."
-      />
-      <div className="grid gap-4 md:grid-cols-2">
-        <StatusTile
-          title="Academic Calendar"
-          badge="Phase 1"
-          description="Quarter dates, grading windows, events, and academic milestones."
-        />
-        <StatusTile
-          title="Branding"
-          badge="Phase 1"
-          description="School logo, identity colors, and portal branding controls."
-        />
-        <StatusTile
-          title="Enrollment Toggle"
-          badge="Phase 1"
-          description="Control whether enrollment flows are open for applicants."
-        />
-        <StatusTile
-          title="Security Policies"
-          badge="Phase 1"
-          description="Policy-level controls for account and portal protection."
-        />
-      </div>
-    </div>
-  )
+  return <SchoolSettingsPanelComponent />
 }
 
 function InfoBlock({ title, description }) {

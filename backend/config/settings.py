@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "apps.communications",
     "apps.enrollment",
     "apps.system",
+    "apps.core",
 ]
 
 MIDDLEWARE = [
