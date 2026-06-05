@@ -27,10 +27,10 @@ class Migration(migrations.Migration):
         # Add indexes for announcements
         migrations.AddIndex(
             model_name='announcement',
-            index=models.Index(fields=['published', 'published_at'], name='announce_pub_date_idx'),
+            index=models.Index(fields=['published_at'], name='announce_pub_date_idx'),
         ),
         migrations.AddIndex(
             model_name='announcement',
-            index=models.Index(fields=['target_role', 'published'], name='announce_role_pub_idx'),
+            index=models.Index(fields=['audience_type', 'published_at'], name='announce_aud_pub_idx'),
         ),
     ]
