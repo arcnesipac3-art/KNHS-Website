@@ -351,7 +351,7 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
                 ),
                 last_message_id=Subquery(last_message.values("id")[:1]),
                 last_message_sender_id=Subquery(last_message.values("sender_id")[:1]),
-                last_message_sender_name=Subquery(last_message.values("sender__display_name")[:1]),
+                last_message_sender_name=Subquery(last_message.values("sender__email")[:1]),
                 last_message_sender_email=Subquery(last_message.values("sender__email")[:1]),
                 last_message_content=Subquery(last_message.values("content")[:1]),
                 last_message_created_at=Subquery(last_message.values("created_at")[:1]),
