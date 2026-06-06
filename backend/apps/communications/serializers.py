@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread
 
 
 class AnnouncementAttachmentSerializer(serializers.ModelSerializer):
@@ -134,3 +134,109 @@ class NotificationPreferencesSerializer(serializers.ModelSerializer):
             'inapp_materials',
             'inapp_submissions',
         ]
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    """Serializer for individual messages."""
+
+    sender_name = serializers.CharField(source="sender.display_name", read_only=True)
+    sender_email = serializers.EmailField(source="sender.email", read_only=True)
+
+    class Meta:
+        model = Message
+        fields = [
+            "id",
+            "thread",
+            "sender",
+            "sender_name",
+            "sender_email",
+            "content",
+            "is_read",
+            "created_at",
+        ]
+        read_only_fields = ["id", "sender", "created_at"]
+
+
+class MessageThreadSerializer(serializers.ModelSerializer):
+    """Serializer for message threads."""
+
+    participants_detail = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageThread
+        fields = [
+            "id",
+            "participants",
+            "participants_detail",
+            "subject",
+            "last_message",
+            "unread_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_participants_detail(self, obj):
+        """Get detailed participant information."""
+        request = self.context.get("request")
+        participants = []
+        for user in obj.participants.all():
+            participants.append({
+                "id": str(user.id),
+                "name": user.display_name,
+                "email": user.email,
+                "role": user.role,
+                "is_current_user": request and request.user == user,
+            })
+        return participants
+
+    def get_last_message(self, obj):
+        """Get the last message in the thread."""
+        last_message = obj.last_message
+        if last_message:
+            return MessageSerializer(last_message, context=self.context).data
+        return None
+
+    def get_unread_count(self, obj):
+        """Get unread message count for current user."""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
+        return 0
+
+
+class CreateMessageThreadSerializer(serializers.Serializer):
+    """Serializer for creating a new message thread."""
+
+    participant_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=1,
+        help_text="List of user IDs to include in the thread"
+    )
+    subject = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    initial_message = serializers.CharField(required=True)
+
+    def validate_participant_ids(self, value):
+        """Validate that all participant IDs exist and are not the current user."""
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            raise serializers.ValidationError("Authentication required")
+
+        from apps.accounts.models import User
+        users = User.objects.filter(id__in=value)
+        
+        if users.count() != len(value):
+            raise serializers.ValidationError("One or more users not found")
+        
+        if request.user.id in value:
+            raise serializers.ValidationError("Cannot include yourself as a participant")
+        
+        return value
+
+
+class CreateMessageSerializer(serializers.Serializer):
+    """Serializer for creating a new message in a thread."""
+
+    content = serializers.CharField(required=True)

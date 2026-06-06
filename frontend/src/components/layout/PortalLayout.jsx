@@ -12,6 +12,7 @@ const NAV_BY_ROLE = {
     { to: '/attendance', label: 'Attendance' },
     { to: '/schedule', label: 'Schedule' },
     { to: '/grades', label: 'Grades' },
+    { to: '/messages', label: 'Messages' },
     { to: '/announcements', label: 'Announcements' },
   ],
   teacher: [
@@ -22,6 +23,7 @@ const NAV_BY_ROLE = {
     { to: '/grades', label: 'Grades' },
     { to: '/report-cards', label: 'Report Cards' },
     { to: '/attendance', label: 'Attendance' },
+    { to: '/messages', label: 'Messages' },
     { to: '/announcements', label: 'Announcements' },
   ],
   admin: [
@@ -32,6 +34,7 @@ const NAV_BY_ROLE = {
     { to: '/report-cards', label: 'Report Cards' },
     { to: '/reports', label: 'Reports' },
     { to: '/analytics', label: 'Analytics' },
+    { to: '/messages', label: 'Messages' },
     { to: '/announcements', label: 'Announcements' },
     { to: '/settings', label: 'Settings' },
   ],
@@ -42,12 +45,14 @@ const NAV_BY_ROLE = {
     { to: '/analytics', label: 'Analytics' },
     { to: '/report-cards', label: 'Report Cards' },
     { to: '/reports', label: 'Reports' },
+    { to: '/messages', label: 'Messages' },
     { to: '/announcements', label: 'Announcements' },
     { to: '/settings', label: 'Settings' },
   ],
   guidance: [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/students', label: 'Student Lookup' },
+    { to: '/messages', label: 'Messages' },
     { to: '/announcements', label: 'Announcements' },
   ],
   registrar: [
@@ -60,6 +65,7 @@ const NAV_BY_ROLE = {
   parent: [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/grades', label: 'Child Grades' },
+    { to: '/messages', label: 'Messages' },
     { to: '/announcements', label: 'Announcements' },
   ],
 }

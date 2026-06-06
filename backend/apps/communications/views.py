@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.academics.permissions import IsAdminUser
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread
 from .serializers import (
     AnnouncementSerializer,
     AnnouncementAttachmentSerializer,
@@ -14,6 +14,10 @@ from .serializers import (
     NotificationSerializer,
     PublishAnnouncementSerializer,
     NotificationPreferencesSerializer,
+    MessageSerializer,
+    MessageThreadSerializer,
+    CreateMessageThreadSerializer,
+    CreateMessageSerializer,
 )
 
 
@@ -252,3 +256,84 @@ class NotificationPreferencesViewSet(viewsets.ModelViewSet):
         obj = self.get_object()
         serializer = self.get_serializer(obj)
         return Response(serializer.data)
+
+
+class MessageThreadViewSet(viewsets.ModelViewSet):
+    """Direct messaging thread management."""
+
+    serializer_class = MessageThreadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Users can only access threads they participate in
+        return MessageThread.objects.filter(
+            participants=self.request.user
+        ).prefetch_related('participants', 'messages')
+
+    def perform_create(self, serializer):
+        # Add current user as a participant when creating a thread
+        thread = serializer.save()
+        thread.participants.add(self.request.user)
+
+    @action(detail=False, methods=["post"])
+    def start_conversation(self, request):
+        """Start a new conversation with participants."""
+        serializer = CreateMessageThreadSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        # Create thread
+        thread = MessageThread.objects.create(
+            subject=serializer.validated_data.get("subject", "")
+        )
+        thread.participants.add(request.user)
+        
+        # Add other participants
+        from apps.accounts.models import User
+        participants = User.objects.filter(id__in=serializer.validated_data["participant_ids"])
+        thread.participants.add(*participants)
+
+        # Create initial message
+        Message.objects.create(
+            thread=thread,
+            sender=request.user,
+            content=serializer.validated_data["initial_message"]
+        )
+
+        return Response(
+            MessageThreadSerializer(thread, context={"request": request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=["post"])
+    def mark_read(self, request, pk=None):
+        """Mark all messages in thread as read for current user."""
+        thread = self.get_object()
+        thread.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
+        return Response({"message": "Messages marked as read"})
+
+
+class MessageViewSet(viewsets.ModelViewSet):
+    """Individual message management."""
+
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Users can only access messages from threads they participate in
+        user_threads = MessageThread.objects.filter(participants=self.request.user)
+        return Message.objects.filter(thread__in=user_threads).select_related('sender', 'thread')
+
+    def perform_create(self, serializer):
+        # Set sender to current user and update thread timestamp
+        message = serializer.save(sender=self.request.user)
+        message.thread.updated_at = timezone.now()
+        message.thread.save()
+
+    @action(detail=True, methods=["post"])
+    def mark_read(self, request, pk=None):
+        """Mark a single message as read."""
+        message = self.get_object()
+        if message.sender != request.user:
+            message.is_read = True
+            message.save()
+        return Response({"message": "Message marked as read"})

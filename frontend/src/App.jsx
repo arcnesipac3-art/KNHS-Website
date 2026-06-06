@@ -73,6 +73,7 @@ const GuidanceDashboard = lazy(() => import('./pages/GuidanceDashboard'))
 const RegistrarDashboard = lazy(() => import('./pages/RegistrarDashboard'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Schedule = lazy(() => import('./pages/Schedule'))
+const Messages = lazy(() => import('./pages/Messages'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -153,6 +154,10 @@ function App() {
               <Route
                 path="notifications"
                 element={<Notifications />}
+              />
+              <Route
+                path="messages"
+                element={<Messages />}
               />
               <Route
                 path="profile"

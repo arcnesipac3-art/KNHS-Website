@@ -182,3 +182,58 @@ class NotificationPreferences(models.Model):
 
     def __str__(self):
         return f'Preferences for {self.user.email}'
+
+
+class MessageThread(models.Model):
+    """Conversation thread between users for direct messaging."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    participants = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='message_threads'
+    )
+    subject = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['-updated_at']),
+        ]
+
+    def __str__(self):
+        return f'Thread {self.id} ({self.participants.count()} participants)'
+
+    @property
+    def last_message(self):
+        """Get the most recent message in this thread."""
+        return self.messages.order_by('-created_at').first()
+
+
+class Message(models.Model):
+    """Individual message in a conversation thread."""
+
+    thread = models.ForeignKey(
+        MessageThread,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='sent_messages'
+    )
+    content = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['thread', '-created_at']),
+            models.Index(fields=['sender', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'Message from {self.sender.display_name} at {self.created_at}'
