@@ -402,14 +402,25 @@ export default function Messages() {
   }
 
   async function handleSendMessage(e) {
-    e.preventDefault()
-    if (!newMessage.trim() || !selectedThread) return
+    e.preventDefault();
+    // Validate message content
+    if (!newMessage.trim()) {
+      alert('Message cannot be empty');
+      return;
+    }
+    // Validate a thread is selected
+    if (!selectedThread) {
+      alert('Please select a conversation before sending a message');
+      return;
+    }
+    const threadId = Number(selectedThread.id);
+    if (isNaN(threadId)) {
+      alert('Invalid thread ID');
+      return;
+    }
 
-    const threadId = selectedThread.id ? Number(selectedThread.id) : null
-    if (!threadId || isNaN(threadId)) return
-
-    const content = newMessage.trim()
-    const clientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const content = newMessage.trim();
+    const clientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const optimisticMessage = {
       id: clientId,
       thread: threadId,
@@ -420,17 +431,17 @@ export default function Messages() {
       is_read: true,
       created_at: new Date().toISOString(),
       pending: true,
-    }
+    };
 
-    setNewMessage('')
+    setNewMessage('');
     const optimisticMessages = reconcileMessage(
       messageCacheRef.current.get(threadId) || [],
       optimisticMessage,
       clientId,
       user
-    )
-    updateCachedMessages(threadId, optimisticMessages)
-    promoteThreadLocally(threadId, optimisticMessage)
+    );
+    updateCachedMessages(threadId, optimisticMessages);
+    promoteThreadLocally(threadId, optimisticMessage);
 
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(
@@ -440,36 +451,36 @@ export default function Messages() {
           content,
           client_id: clientId,
         })
-      )
-      return
+      );
+      return;
     }
 
-    setSending(true)
+    setSending(true);
     try {
       const response = await api.post('/messages/', {
         thread: threadId,
         content,
-      })
+      });
       const nextMessages = reconcileMessage(
         messageCacheRef.current.get(threadId) || [],
         response.data,
         clientId,
         user
-      )
-      updateCachedMessages(threadId, nextMessages)
-      promoteThreadLocally(threadId, response.data)
-      await markThreadRead(threadId, { silent: true })
+      );
+      updateCachedMessages(threadId, nextMessages);
+      promoteThreadLocally(threadId, response.data);
+      await markThreadRead(threadId, { silent: true });
     } catch (error) {
-      console.error('Failed to send message:', error)
+      console.error('Failed to send message:', error);
       const rolledBackMessages = removePendingMessage(
         messageCacheRef.current.get(threadId) || [],
         clientId
-      )
-      updateCachedMessages(threadId, rolledBackMessages)
-      setNewMessage(content)
-      alert('Failed to send message. Please try again.')
+      );
+      updateCachedMessages(threadId, rolledBackMessages);
+      setNewMessage(content);
+      alert('Failed to send message. Please try again.');
     } finally {
-      setSending(false)
+      setSending(false);
     }
   }
 

@@ -94,7 +94,7 @@ export default function ApprovalCenter() {
         setSelectedItems(new Set()) // Clear selections when queue changes
       } catch (err) {
         console.error('Failed to load approval queue:', err)
-        setError('Failed to load pending approvals. Please try again.')
+        setError('Failed to load queue. Please try again.')
       } finally {
         setLoading(false)
       }
@@ -525,7 +525,7 @@ export default function ApprovalCenter() {
               <h3 className="mt-4 text-lg font-medium text-text">All Caught Up!</h3>
               <p className="mt-2 text-sm text-muted">
                 {selectedQuarter
-                  ? 'No pending grade approvals for this quarter.'
+                  ? 'No grades pending for this quarter.'
                   : 'Please select a quarter to view pending approvals.'}
               </p>
             </div>
