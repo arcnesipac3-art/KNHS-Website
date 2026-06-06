@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
+    "debug_toolbar",
     "apps.accounts",
     "apps.academics",
     "apps.learning",
@@ -57,6 +59,10 @@ MIDDLEWARE = [
     "config.middleware.RateLimitMiddleware",
     "config.middleware.SecurityHeadersMiddleware",
 ]
+
+# Django Debug Toolbar (only in development)
+if DEBUG:
+    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
 ROOT_URLCONF = "config.urls"
 
@@ -202,6 +208,11 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.system.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,  # Increased from 20 → reduces number of paginated API calls on list pages
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
 }
 
 JWT_ACCESS_MINUTES = int(os.getenv("JWT_ACCESS_MINUTES", "15"))
@@ -260,3 +271,15 @@ LOGGING = {
 # Whitenoise caching headers — serve static files with long cache TTL
 # so browsers don't re-download CSS/JS on every page load
 WHITENOISE_MAX_AGE = 31536000  # 1 year (files are content-hashed so this is safe)
+
+# Django Debug Toolbar settings
+if DEBUG:
+    INTERNAL_IPS = [
+        "127.0.0.1",
+        "localhost",
+    ]
+    # Allow debug toolbar in development
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_COLLAPSED": True,
+        "SHOW_TEMPLATE_CONTEXT": True,
+    }
