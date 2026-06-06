@@ -50,6 +50,10 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
             await self.handle_send_message(content)
             return
 
+        if event_type == "ping":
+            await self.send_json({"type": "pong"})
+            return
+
         await self.send_json(
             {
                 "type": "error",
@@ -81,6 +85,7 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
     async def handle_send_message(self, content):
         thread_id = content.get("thread_id")
         message_text = (content.get("content") or "").strip()
+        client_id = content.get("client_id")
 
         if not thread_id or not message_text:
             await self.send_json({"type": "error", "message": "thread_id and content are required."})
@@ -98,6 +103,7 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
                 "type": "message.created",
                 "thread_id": str(thread.id),
                 "message": message_data,
+                "client_id": client_id,
             },
         )
 
@@ -116,6 +122,7 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
                 "type": "message.created",
                 "thread_id": event["thread_id"],
                 "message": event["message"],
+                "client_id": event.get("client_id"),
             }
         )
 

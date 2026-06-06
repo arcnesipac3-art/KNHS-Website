@@ -96,13 +96,23 @@ export default function Messages() {
   }, [showNewConversation, debouncedSearch])
 
   useEffect(() => {
-    const token = getAccessToken()
-    if (!token) return undefined
-
     let cancelled = false
     let reconnectAttempts = 0
+    let heartbeatIntervalRef = null
+
+    function getToken() {
+      return getAccessToken()
+    }
 
     function connect() {
+      const token = getToken()
+      if (!token) {
+        if (!cancelled) {
+          reconnectTimeoutRef.current = window.setTimeout(connect, 1000)
+        }
+        return
+      }
+
       const socket = new WebSocket(
         `${getWebSocketBaseUrl()}/ws/messages/?token=${encodeURIComponent(token)}`
       )
@@ -112,6 +122,16 @@ export default function Messages() {
         if (cancelled) return
         setSocketConnected(true)
         reconnectAttempts = 0
+
+        if (heartbeatIntervalRef) {
+          clearInterval(heartbeatIntervalRef)
+        }
+        heartbeatIntervalRef = setInterval(() => {
+          if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ type: 'ping' }))
+          }
+        }, 25000)
+
         if (selectedThreadRef.current?.id) {
           socket.send(
             JSON.stringify({
@@ -125,7 +145,16 @@ export default function Messages() {
 
       socket.onmessage = (event) => {
         if (cancelled) return
-        const payload = JSON.parse(event.data)
+        let payload
+        try {
+          payload = JSON.parse(event.data)
+        } catch {
+          return
+        }
+
+        if (payload.type === 'pong') {
+          return
+        }
 
         if (payload.type === 'message.created') {
           if (payload.thread_id === selectedThreadRef.current?.id) {
@@ -147,6 +176,10 @@ export default function Messages() {
         if (payload.type === 'thread.updated') {
           applyThreadUpdate(payload.thread)
         }
+
+        if (payload.type === 'error') {
+          console.error('WebSocket server error:', payload.message)
+        }
       }
 
       socket.onerror = (error) => {
@@ -157,9 +190,23 @@ export default function Messages() {
       socket.onclose = (event) => {
         if (cancelled) return
         setSocketConnected(false)
+        if (heartbeatIntervalRef) {
+          clearInterval(heartbeatIntervalRef)
+          heartbeatIntervalRef = null
+        }
         console.log('WebSocket closed:', event.code, event.reason)
-        // Only reconnect if not intentionally closed
+
+        const isAbnormal = event.code === 1006
+        const isAuthFailure = event.code === 4401 || event.code === 4001
+        const isPolicyViolation = event.code === 1008
+
         if (!cancelled) {
+          if (isAuthFailure) {
+            console.log('Auth failure, waiting for token refresh...')
+            reconnectTimeoutRef.current = window.setTimeout(connect, 2000)
+            return
+          }
+
           reconnectAttempts += 1
           const backoff = Math.min(2000 * Math.pow(1.5, reconnectAttempts - 1), 30000)
           reconnectTimeoutRef.current = window.setTimeout(connect, backoff)
@@ -167,16 +214,28 @@ export default function Messages() {
       }
     }
 
+    const handleSessionExpired = () => {
+      reconnectAttempts = 0
+      if (!cancelled) {
+        connect()
+      }
+    }
+
+    window.addEventListener('auth:session-expired', handleSessionExpired)
     connect()
 
     return () => {
       cancelled = true
       setSocketConnected(false)
+      window.removeEventListener('auth:session-expired', handleSessionExpired)
       if (reconnectTimeoutRef.current) {
         window.clearTimeout(reconnectTimeoutRef.current)
       }
+      if (heartbeatIntervalRef) {
+        clearInterval(heartbeatIntervalRef)
+      }
       if (socketRef.current?.readyState === WebSocket.OPEN) {
-        socketRef.current.close()
+        socketRef.current.close(1000, 'Component unmounting')
       }
       socketRef.current = null
     }

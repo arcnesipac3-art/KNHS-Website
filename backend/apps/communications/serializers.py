@@ -224,6 +224,17 @@ class MessageThreadSerializer(serializers.ModelSerializer):
 
     def get_last_message(self, obj):
         """Get the last message in the thread."""
+        if getattr(obj, "last_message_id", None):
+            return {
+                "id": obj.last_message_id,
+                "thread": str(obj.id),
+                "sender": str(obj.last_message_sender_id) if obj.last_message_sender_id else None,
+                "sender_name": obj.last_message_sender_name,
+                "sender_email": obj.last_message_sender_email,
+                "content": obj.last_message_content,
+                "is_read": True,
+                "created_at": obj.last_message_created_at,
+            }
         last_message = obj.last_message
         if last_message:
             return MessageSerializer(last_message, context=self.context).data
@@ -231,6 +242,8 @@ class MessageThreadSerializer(serializers.ModelSerializer):
 
     def get_unread_count(self, obj):
         """Get unread message count for current user."""
+        if hasattr(obj, "unread_count_value"):
+            return obj.unread_count_value
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
