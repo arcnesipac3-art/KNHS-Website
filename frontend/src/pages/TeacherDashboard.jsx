@@ -6,18 +6,25 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { getTeacherDashboard } from '../lib/learningApi'
 import { getCurrentAcademicYearWithQuarters } from '../lib/academicApi'
+import api from '../lib/api'
 
 export default function TeacherDashboard() {
   const { user } = useAuth()
   const [dashboard, setDashboard] = useState(null)
   const [academicYear, setAcademicYear] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [studentAlerts, setStudentAlerts] = useState([])
+  const [announcements, setAnnouncements] = useState([])
+  const [todaySchedule, setTodaySchedule] = useState([])
 
   useEffect(() => {
     async function loadDashboard() {
-      const [dashboardResult, yearResult] = await Promise.allSettled([
+      const [dashboardResult, yearResult, alertsResult, announcementsResult, scheduleResult] = await Promise.allSettled([
         getTeacherDashboard(),
         getCurrentAcademicYearWithQuarters(),
+        api.get('/attendance/student-alerts/'),
+        api.get('/announcements/?limit=5'),
+        api.get('/schedule/today/'),
       ])
 
       if (dashboardResult.status === 'fulfilled') {
@@ -31,6 +38,24 @@ export default function TeacherDashboard() {
         setAcademicYear(yearResult.value)
       } else {
         setAcademicYear({ academicYear: null, quarters: [] })
+      }
+
+      if (alertsResult.status === 'fulfilled') {
+        setStudentAlerts(alertsResult.value.results || alertsResult.value || [])
+      } else {
+        setStudentAlerts([])
+      }
+
+      if (announcementsResult.status === 'fulfilled') {
+        setAnnouncements(announcementsResult.value.results || announcementsResult.value || [])
+      } else {
+        setAnnouncements([])
+      }
+
+      if (scheduleResult.status === 'fulfilled') {
+        setTodaySchedule(scheduleResult.value || [])
+      } else {
+        setTodaySchedule([])
       }
 
       setLoading(false)
@@ -158,10 +183,74 @@ export default function TeacherDashboard() {
           </Card>
         </div>
 
-        {/* Main Content: 2-column layout */}
+        {/* Main Content: 3-column layout */}
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Left Column (2/3) */}
           <div className="space-y-8 lg:col-span-2">
+            {/* Today's Schedule */}
+            <Card title="Today's Schedule" subtitle="Your classes for today">
+              {todaySchedule?.length > 0 ? (
+                <div className="space-y-3">
+                  {todaySchedule.map((schedule) => (
+                    <div
+                      key={schedule.id}
+                      className="flex items-center justify-between rounded-lg border border-gray-200 p-4 hover:bg-gray-50"
+                    >
+                      <div className="flex-1">
+                        <h4 className="font-medium text-text">{schedule.subject_name}</h4>
+                        <p className="text-sm text-muted">
+                          {schedule.class_name} • {schedule.room}
+                        </p>
+                        <p className="text-sm text-muted">
+                          {schedule.start_time} - {schedule.end_time}
+                        </p>
+                      </div>
+                      <Link to={`/classes/${schedule.class_id}`}>
+                        <Button size="sm">View Class</Button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <p className="text-muted">No classes scheduled for today</p>
+                  <p className="mt-1 text-sm text-muted">Enjoy your free time! 🎉</p>
+                </div>
+              )}
+            </Card>
+
+            {/* Student Alerts */}
+            {studentAlerts?.length > 0 && (
+              <Card title="Student Alerts" subtitle="Attendance and performance issues">
+                <div className="space-y-3">
+                  {studentAlerts.slice(0, 5).map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`flex items-start justify-between rounded-lg border p-4 ${
+                        alert.alert_type === 'attendance' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <h4 className="font-medium text-text">{alert.student_name}</h4>
+                        <p className="text-sm text-muted">
+                          {alert.alert_type === 'attendance' ? 'Attendance Issue' : 'Performance Alert'}
+                        </p>
+                        <p className="text-sm text-muted">{alert.message}</p>
+                      </div>
+                      <Link to={`/students/${alert.student_id}`}>
+                        <Button size="sm" variant="secondary">View</Button>
+                      </Link>
+                    </div>
+                  ))}
+                  {studentAlerts.length > 5 && (
+                    <Link to="/students" className="block text-center text-sm text-knhs-purple hover:underline">
+                      View all {studentAlerts.length} alerts →
+                    </Link>
+                  )}
+                </div>
+              </Card>
+            )}
+
             {/* Ungraded Submissions */}
             <Card title="Pending Submissions" subtitle="Assignments waiting for your review">
               {dashboard?.ungradedSubmissions?.length > 0 ? (
@@ -244,6 +333,34 @@ export default function TeacherDashboard() {
 
           {/* Right Column (1/3) */}
           <div className="space-y-8">
+            {/* Recent Announcements */}
+            <Card title="Recent Announcements" subtitle="Latest school updates">
+              {announcements?.length > 0 ? (
+                <div className="space-y-3">
+                  {announcements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className="rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
+                    >
+                      <h5 className="text-sm font-medium text-text">{announcement.title}</h5>
+                      <p className="mt-1 text-xs text-muted line-clamp-2">{announcement.content}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {new Date(announcement.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                  <Link
+                    to="/announcements"
+                    className="block text-center text-sm text-knhs-purple hover:underline"
+                  >
+                    View all →
+                  </Link>
+                </div>
+              ) : (
+                <p className="py-4 text-center text-sm text-muted">No recent announcements</p>
+              )}
+            </Card>
+
             {/* Recent Assignments */}
             <Card title="My Assignments" subtitle="Recently created">
               {dashboard?.myAssignments?.length > 0 ? (
@@ -298,7 +415,7 @@ export default function TeacherDashboard() {
                 </Link>
 
                 <Link
-                  to="/announcements"
+                  to="/announcements/create"
                   className="block rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
                 >
                   <div className="flex items-center gap-3">
@@ -325,7 +442,7 @@ export default function TeacherDashboard() {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-text">Class Schedule</p>
+                      <p className="text-sm font-medium text-text">Full Schedule</p>
                       <p className="text-xs text-muted">View your timetable</p>
                     </div>
                   </div>
