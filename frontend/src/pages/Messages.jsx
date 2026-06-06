@@ -67,7 +67,7 @@ export default function Messages() {
     if (showNewConversation) {
       loadFriends()
     }
-  }, [showNewConversation, loadFriends])
+  }, [showNewConversation])
 
   useEffect(() => {
     // Debounce search input to reduce API calls
@@ -88,7 +88,7 @@ export default function Messages() {
     if (showNewConversation && debouncedSearch.length >= 2) {
       loadAvailableUsers()
     }
-  }, [showNewConversation, debouncedSearch, loadAvailableUsers])
+  }, [showNewConversation, debouncedSearch])
 
   useEffect(() => {
     const token = getAccessToken()
@@ -185,7 +185,7 @@ export default function Messages() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  const loadAvailableUsers = useCallback(async () => {
+  async function loadAvailableUsers() {
     setLoadingUsers(true)
     try {
       const response = await api.get('/users/', { params: { search: debouncedSearch } })
@@ -200,9 +200,9 @@ export default function Messages() {
     } finally {
       setLoadingUsers(false)
     }
-  }, [debouncedSearch, selectedParticipants, user?.id])
+  }
 
-  const loadFriends = useCallback(async () => {
+  async function loadFriends() {
     setLoadingFriends(true)
     try {
       const response = await api.get('/friendships/my_friends/')
@@ -218,7 +218,7 @@ export default function Messages() {
     } finally {
       setLoadingFriends(false)
     }
-  }, [selectedParticipants])
+  }
 
   async function loadThreads() {
     try {
@@ -323,14 +323,14 @@ export default function Messages() {
   }
 
   const handleAddParticipant = useCallback((user) => {
-    setSelectedParticipants([...selectedParticipants, user])
-    setAvailableUsers(availableUsers.filter(u => u.id !== user.id))
+    setSelectedParticipants(prev => [...prev, user])
+    setAvailableUsers(prev => prev.filter(u => u.id !== user.id))
     setSearchUsers('')
-  }, [selectedParticipants, availableUsers])
+  }, [])
 
   const handleRemoveParticipant = useCallback((userId) => {
-    setSelectedParticipants(selectedParticipants.filter(p => p.id !== userId))
-  }, [selectedParticipants])
+    setSelectedParticipants(prev => prev.filter(p => p.id !== userId))
+  }, [])
 
   const getAvatar = useCallback((name) => {
     return name ? name.charAt(0).toUpperCase() : '?'
@@ -370,9 +370,6 @@ export default function Messages() {
     const otherParticipants = selectedThread.participants_detail.filter((p) => !p.is_current_user)
     return selectedThread.subject || otherParticipants.map((p) => p.name).join(', ')
   }, [selectedThread])
-
-  const memoizedThreads = useMemo(() => threads, [threads])
-  const memoizedMessages = useMemo(() => messages, [messages])
 
   return (
     <PortalLayout>
@@ -570,7 +567,7 @@ export default function Messages() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {memoizedThreads.map(thread => {
+                  {threads.map(thread => {
                     const otherParticipants = thread.participants_detail.filter(p => !p.is_current_user)
                     const displayName = otherParticipants.map(p => p.name).join(', ') || 'Unknown'
                     const lastMessage = thread.last_message
@@ -646,7 +643,7 @@ export default function Messages() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {memoizedMessages.map(message => {
+                      {messages.map(message => {
                         const isOwn = message.sender === user?.id || message.sender_email === user?.email
                         return (
                           <div
