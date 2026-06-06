@@ -37,8 +37,9 @@ export default function MarkAttendance() {
     async function loadClassrooms() {
       try {
         const { data } = await classroomApi.getAll()
-        setClassrooms(data)
-        if (classroomId && data.some((c) => c.id === classroomId)) {
+        const classroomList = Array.isArray(data) ? data : (data?.results ?? [])
+        setClassrooms(classroomList)
+        if (classroomId && classroomList.some((c) => c.id === classroomId)) {
           setSelectedClassroom(classroomId)
         }
       } catch (err) {
@@ -66,11 +67,12 @@ export default function MarkAttendance() {
 
       try {
         const { data } = await classroomApi.getEnrollments(selectedClassroom, 'active')
-        setEnrollments(data)
+        const enrollmentList = Array.isArray(data) ? data : (data?.results ?? [])
+        setEnrollments(enrollmentList)
 
         // Initialize attendance with 'P' (Present) for all students
         const initialAttendance = {}
-        data.forEach((enrollment) => {
+        enrollmentList.forEach((enrollment) => {
           initialAttendance[enrollment.id] = 'P'
         })
         setAttendance(initialAttendance)
@@ -82,9 +84,10 @@ export default function MarkAttendance() {
             date_from: selectedDate,
             date_to: selectedDate,
           })
+          const records = Array.isArray(existingRecords) ? existingRecords : (existingRecords?.results ?? [])
 
           // Map existing records to attendance state
-          existingRecords.forEach((record) => {
+          records.forEach((record) => {
             if (record.enrollment_id && initialAttendance.hasOwnProperty(record.enrollment_id)) {
               initialAttendance[record.enrollment_id] = record.status
             }
