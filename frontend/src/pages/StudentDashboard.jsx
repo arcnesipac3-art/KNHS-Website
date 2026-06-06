@@ -6,18 +6,21 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { getStudentDashboard } from '../lib/learningApi'
 import { getCurrentAcademicYearWithQuarters } from '../lib/academicApi'
+import api from '../lib/api'
 
 export default function StudentDashboard() {
   const { user } = useAuth()
   const [dashboard, setDashboard] = useState(null)
   const [academicYear, setAcademicYear] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [attendance, setAttendance] = useState(null)
 
   useEffect(() => {
     async function loadDashboard() {
-      const [dashboardResult, yearResult] = await Promise.allSettled([
+      const [dashboardResult, yearResult, attendanceResult] = await Promise.allSettled([
         getStudentDashboard(),
         getCurrentAcademicYearWithQuarters(),
+        api.get('/attendance/summary/'),
       ])
 
       if (dashboardResult.status === 'fulfilled') {
@@ -31,6 +34,12 @@ export default function StudentDashboard() {
         setAcademicYear(yearResult.value)
       } else {
         setAcademicYear({ academicYear: null, quarters: [] })
+      }
+
+      if (attendanceResult.status === 'fulfilled') {
+        setAttendance(attendanceResult.value)
+      } else {
+        setAttendance(null)
       }
 
       setLoading(false)
@@ -62,6 +71,17 @@ export default function StudentDashboard() {
   const quarters = Array.isArray(academicYear?.quarters) ? academicYear.quarters : []
   const currentQuarter = quarters.find((q) => q.is_active) || null
 
+  // Calculate GPA from published grades
+  const calculateGPA = (grades) => {
+    if (!grades || grades.length === 0) return 0
+    const validGrades = grades.filter(g => g.transmuted_grade && !isNaN(g.transmuted_grade))
+    if (validGrades.length === 0) return 0
+    const sum = validGrades.reduce((acc, g) => acc + g.transmuted_grade, 0)
+    return (sum / validGrades.length).toFixed(2)
+  }
+
+  const gpa = calculateGPA(dashboard?.publishedGrades)
+
   return (
     <PortalLayout>
       <div className="space-y-8">{/* Welcome Banner */}
@@ -88,10 +108,27 @@ export default function StudentDashboard() {
           <Link to="/grades">
             <Button variant="secondary">Check Grades</Button>
           </Link>
+          <Link to="/messages">
+            <Button variant="secondary">Messages</Button>
+          </Link>
         </div>
 
         {/* KPI Cards */}
         <div className="grid gap-4 md:grid-cols-4">
+          <Card className="border-l-4 border-l-purple-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-2xl font-bold text-text">{gpa}</p>
+                <p className="text-sm text-muted">GPA</p>
+              </div>
+              <div className="rounded-lg bg-purple-100 p-3">
+                <svg className="h-6 w-6 text-knhs-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+
           <Card className="border-l-4 border-l-amber-500">
             <div className="flex items-center justify-between">
               <div>
@@ -120,20 +157,6 @@ export default function StudentDashboard() {
             </div>
           </Card>
 
-          <Card className="border-l-4 border-l-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-text">{dashboard?.publishedGrades.length || 0}</p>
-                <p className="text-sm text-muted">Published Grades</p>
-              </div>
-              <div className="rounded-lg bg-green-100 p-3">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </Card>
-
           <Card className="border-l-4 border-l-blue-500">
             <div className="flex items-center justify-between">
               <div>
@@ -153,6 +176,26 @@ export default function StudentDashboard() {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Left Column (2/3) */}
           <div className="space-y-8 lg:col-span-2">
+            {/* Attendance Summary */}
+            {attendance && (
+              <Card title="Attendance Summary" subtitle="Your attendance record this quarter">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-lg bg-green-50 p-4 text-center">
+                    <p className="text-3xl font-bold text-green-600">{attendance.present_days || 0}</p>
+                    <p className="text-sm text-muted">Days Present</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-4 text-center">
+                    <p className="text-3xl font-bold text-amber-600">{attendance.absent_days || 0}</p>
+                    <p className="text-sm text-muted">Days Absent</p>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 p-4 text-center">
+                    <p className="text-3xl font-bold text-blue-600">{attendance.attendance_rate || 0}%</p>
+                    <p className="text-sm text-muted">Attendance Rate</p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Due Soon */}
             <Card title="Due Soon" subtitle="Assignments due in the next 7 days">
               {dashboard?.pendingAssignments.length > 0 ? (
