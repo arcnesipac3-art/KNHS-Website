@@ -33,15 +33,10 @@ export default function AnnouncementList() {
         data = response.data
       }
       
-      // Ensure data is an array
-      if (!Array.isArray(data)) {
-        console.error('API returned non-array data:', data)
-        setAnnouncements([])
-        setError('Unexpected data format received. Please try again.')
-        return
-      }
+      // Handle both array and paginated responses
+      const announcements = Array.isArray(data) ? data : (data?.results ?? [])
       
-      setAnnouncements(data)
+      setAnnouncements(announcements)
     } catch (err) {
       console.error('Failed to load announcements:', err)
       setError('Failed to load announcements. Please try again.')
