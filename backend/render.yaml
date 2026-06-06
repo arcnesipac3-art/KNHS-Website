@@ -6,7 +6,7 @@ services:
     plan: free
     branch: main
     buildCommand: ./build.sh
-    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    startCommand: daphne -b 0.0.0.0 -p $PORT --proxy-headers config.asgi:application
     healthCheckPath: /api/health/
     envVars:
       - key: PYTHON_VERSION
