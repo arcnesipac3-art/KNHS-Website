@@ -481,19 +481,22 @@ export default function Messages() {
     }
   }
 
-    // Delete conversation using raw thread ID (string)
-    const threadId = threadId; // keep as is
-    try {
-      await api.delete(`/message-threads/${threadId}/delete_conversation/`)
-      messageCacheRef.current.delete(threadId)
-      setThreads(prev => prev.filter(t => t.id !== threadId))
-      if (selectedThread?.id && selectedThread.id === threadId) {
-        setSelectedThread(null)
-        setMessages([])
+    // Delete a conversation thread (async function)
+    async function handleDeleteConversation(threadId) {
+      try {
+        await api.delete(`/message-threads/${threadId}/delete_conversation/`);
+        // Remove from cache and UI state
+        messageCacheRef.current.delete(threadId);
+        setThreads(prev => prev.filter(t => t.id !== threadId));
+        // If the deleted thread is currently selected, clear selection
+        if (selectedThread?.id === threadId) {
+          setSelectedThread(null);
+          setMessages([]);
+        }
+      } catch (error) {
+        console.error('Failed to delete conversation:', error);
+        alert('Failed to delete conversation. Please try again.');
       }
-    } catch (error) {
-      console.error('Failed to delete conversation:', error)
-      alert('Failed to delete conversation. Please try again.')
     }
 
   async function handleStartConversation(e) {
