@@ -74,6 +74,7 @@ const RegistrarDashboard = lazy(() => import('./pages/RegistrarDashboard'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const Messages = lazy(() => import('./pages/Messages'))
+const Friends = lazy(() => import('./pages/Friends'))
 const ParentDashboard = lazy(() => import('./pages/ParentDashboard'))
 const ContentEditor = lazy(() => import('./pages/ContentEditor'))
 
@@ -161,6 +162,10 @@ function App() {
               <Route
                 path="messages"
                 element={<Messages />}
+              />
+              <Route
+                path="friends"
+                element={<Friends />}
               />
               <Route
                 path="profile"

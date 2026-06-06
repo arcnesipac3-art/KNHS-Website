@@ -14,6 +14,7 @@ import {
   GradesIcon,
   AttendanceIcon,
   MessagesIcon,
+  FriendsIcon,
   AnnouncementsIcon,
   UsersIcon,
   EnrollmentIcon,
@@ -41,6 +42,7 @@ const NAV_BY_ROLE = {
     ]},
     { section: 'Communication', items: [
       { to: '/messages', label: 'Messages', icon: MessagesIcon },
+      { to: '/friends', label: 'Friends', icon: FriendsIcon },
       { to: '/announcements', label: 'Announcements', icon: AnnouncementsIcon },
     ]},
   ],
@@ -58,6 +60,7 @@ const NAV_BY_ROLE = {
     ]},
     { section: 'Communication', items: [
       { to: '/messages', label: 'Messages', icon: MessagesIcon },
+      { to: '/friends', label: 'Friends', icon: FriendsIcon },
       { to: '/announcements', label: 'Announcements', icon: AnnouncementsIcon },
     ]},
   ],
@@ -78,6 +81,7 @@ const NAV_BY_ROLE = {
       { to: '/content-editor', label: 'Content Editor', icon: ContentEditorIcon },
       { to: '/announcements', label: 'Announcements', icon: AnnouncementsIcon },
       { to: '/messages', label: 'Messages', icon: MessagesIcon },
+      { to: '/friends', label: 'Friends', icon: FriendsIcon },
     ]},
     { section: 'System', items: [
       { to: '/reports', label: 'Reports', icon: ReportsIcon },
@@ -96,6 +100,7 @@ const NAV_BY_ROLE = {
     ]},
     { section: 'Communication', items: [
       { to: '/messages', label: 'Messages', icon: MessagesIcon },
+      { to: '/friends', label: 'Friends', icon: FriendsIcon },
       { to: '/announcements', label: 'Announcements', icon: AnnouncementsIcon },
     ]},
     { section: 'System', items: [
@@ -110,6 +115,7 @@ const NAV_BY_ROLE = {
     ]},
     { section: 'Communication', items: [
       { to: '/messages', label: 'Messages', icon: MessagesIcon },
+      { to: '/friends', label: 'Friends', icon: FriendsIcon },
       { to: '/announcements', label: 'Announcements', icon: AnnouncementsIcon },
     ]},
   ],
@@ -133,6 +139,7 @@ const NAV_BY_ROLE = {
     ]},
     { section: 'Communication', items: [
       { to: '/messages', label: 'Messages', icon: MessagesIcon },
+      { to: '/friends', label: 'Friends', icon: FriendsIcon },
       { to: '/announcements', label: 'Announcements', icon: AnnouncementsIcon },
     ]},
   ],
