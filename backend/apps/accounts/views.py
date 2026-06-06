@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
@@ -296,25 +297,27 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         # Filter by active status
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            queryset = queryset.filter(is_active=is_active == 'true')
         
-        # Filter by approved status
-        is_approved = self.request.query_params.get('is_approved')
-        if is_approved is not None:
-            queryset = queryset.filter(is_approved=is_approved.lower() == 'true')
-        
-        # Search by name, email, or LRN
+        # Search by name or email
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
                 Q(email__icontains=search) |
                 Q(profile__first_name__icontains=search) |
-                Q(profile__last_name__icontains=search) |
-                Q(profile__lrn__icontains=search) |
-                Q(profile__employee_id__icontains=search)
+                Q(profile__last_name__icontains=search)
             )
         
-        return queryset.order_by('-created_at')
+        # Cache student lists for 5 minutes
+        if role == 'student' and self.action == 'list':
+            cache_key = f"students_list_{role}_{is_active}_{search}"
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+            queryset = list(queryset)
+            cache.set(cache_key, queryset, timeout=300)
+        
+        return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -324,6 +327,10 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 user = serializer.save()
                 logger.info(f"User created successfully: {user.email} (role: {user.role}) by admin: {request.user.email}")
+                
+                # Invalidate student list cache
+                if user.role == 'student':
+                    cache.delete_pattern("students_list_*")
                 
                 # Return detailed user data
                 detail_serializer = UserDetailSerializer(user)
@@ -351,6 +358,10 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 user = serializer.save()
                 logger.info(f"User updated successfully: {user.email} by admin: {request.user.email}")
+                
+                # Invalidate student list cache if student was updated
+                if user.role == 'student':
+                    cache.delete_pattern("students_list_*")
                 
                 # Return detailed user data
                 detail_serializer = UserDetailSerializer(user)

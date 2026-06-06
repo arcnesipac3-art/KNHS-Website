@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Max, Q
 from django.http import HttpResponse
@@ -90,6 +91,15 @@ class GradeViewSet(viewsets.ModelViewSet):
         if status_filter:
             queryset = queryset.filter(status=status_filter)
 
+        # Cache published grades for 5 minutes
+        if status_filter == "published" and self.action == "list":
+            cache_key = f"grades_list_{class_subject_id}_{quarter_id}_{student_id}_{status_filter}"
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+            queryset = list(queryset)
+            cache.set(cache_key, queryset, timeout=300)
+
         # Role-based filtering
         if user.role == "student":
             # Students see only their own published grades
@@ -109,6 +119,21 @@ class GradeViewSet(viewsets.ModelViewSet):
         if self.action in ["publish", "reject", "lock", "unlock", "approval_queue"]:
             return [IsAdminOrPrincipal()] if self.request.user.role == "principal" else [IsAdminUser()]
         return [IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        """Invalidate cache on create."""
+        serializer.save()
+        cache.delete_pattern("grades_list_*")
+
+    def perform_update(self, serializer):
+        """Invalidate cache on update."""
+        serializer.save()
+        cache.delete_pattern("grades_list_*")
+
+    def perform_destroy(self, instance):
+        """Invalidate cache on delete."""
+        instance.delete()
+        cache.delete_pattern("grades_list_*")
 
     @action(detail=False, methods=["post"])
     def batch_input(self, request):

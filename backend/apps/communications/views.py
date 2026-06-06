@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import viewsets, status
@@ -38,6 +39,15 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         # Show only published announcements to students
         if user.role == "student":
             queryset = queryset.filter(published_at__isnull=False, published_at__lte=timezone.now())
+
+        # Cache published announcements for 5 minutes
+        if user.role == "student" and self.action == "list":
+            cache_key = f"announcements_list_{user.role}_{user.profile.grade_level}"
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+            queryset = list(queryset)
+            cache.set(cache_key, queryset, timeout=300)
 
         # Filter by audience type
         if user.role in ["student", "teacher"]:
@@ -82,6 +92,18 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             serializer.save(author=self.request.user, audience_type="classroom")
         else:
             serializer.save(author=self.request.user)
+        # Invalidate cache
+        cache.delete_pattern("announcements_list_*")
+
+    def perform_update(self, serializer):
+        """Invalidate cache on update."""
+        serializer.save()
+        cache.delete_pattern("announcements_list_*")
+
+    def perform_destroy(self, instance):
+        """Invalidate cache on delete."""
+        instance.delete()
+        cache.delete_pattern("announcements_list_*")
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
