@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import api from '../lib/api'
+import api, { getAccessToken, getWebSocketBaseUrl } from '../lib/api'
 
 export default function Messages() {
   const { user } = useAuth()
@@ -20,7 +20,11 @@ export default function Messages() {
   const [subject, setSubject] = useState('')
   const [initialMessage, setInitialMessage] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [socketConnected, setSocketConnected] = useState(false)
   const messagesEndRef = useRef(null)
+  const socketRef = useRef(null)
+  const reconnectTimeoutRef = useRef(null)
+  const subscribedThreadRef = useRef(null)
 
   useEffect(() => {
     loadThreads()
@@ -29,6 +33,7 @@ export default function Messages() {
   useEffect(() => {
     if (selectedThread) {
       loadMessages(selectedThread.id)
+      markThreadRead(selectedThread.id)
     }
   }, [selectedThread])
 
@@ -41,6 +46,86 @@ export default function Messages() {
       loadAvailableUsers()
     }
   }, [showNewConversation, searchUsers])
+
+  useEffect(() => {
+    const token = getAccessToken()
+    if (!token) return undefined
+
+    let cancelled = false
+
+    function connect() {
+      const socket = new WebSocket(
+        `${getWebSocketBaseUrl()}/ws/messages/?token=${encodeURIComponent(token)}`
+      )
+      socketRef.current = socket
+
+      socket.onopen = () => {
+        if (cancelled) return
+        setSocketConnected(true)
+        if (selectedThread?.id) {
+          socket.send(JSON.stringify({ type: 'thread.subscribe', thread_id: selectedThread.id }))
+          subscribedThreadRef.current = selectedThread.id
+        }
+      }
+
+      socket.onmessage = (event) => {
+        const payload = JSON.parse(event.data)
+
+        if (payload.type === 'message.created') {
+          if (payload.thread_id === selectedThread?.id) {
+            setMessages((prev) => upsertMessage(prev, payload.message))
+            markThreadRead(payload.thread_id, { silent: true })
+          }
+          return
+        }
+
+        if (payload.type === 'thread.updated') {
+          setThreads((prev) => sortThreads(upsertThread(prev, payload.thread)))
+          setSelectedThread((prev) => (prev?.id === payload.thread.id ? payload.thread : prev))
+        }
+      }
+
+      socket.onclose = () => {
+        if (cancelled) return
+        setSocketConnected(false)
+        reconnectTimeoutRef.current = window.setTimeout(connect, 2000)
+      }
+    }
+
+    connect()
+
+    return () => {
+      cancelled = true
+      setSocketConnected(false)
+      if (reconnectTimeoutRef.current) {
+        window.clearTimeout(reconnectTimeoutRef.current)
+      }
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.close()
+      }
+      socketRef.current = null
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) return
+
+    if (subscribedThreadRef.current && subscribedThreadRef.current !== selectedThread?.id) {
+      socket.send(
+        JSON.stringify({
+          type: 'thread.unsubscribe',
+          thread_id: subscribedThreadRef.current,
+        })
+      )
+      subscribedThreadRef.current = null
+    }
+
+    if (selectedThread?.id) {
+      socket.send(JSON.stringify({ type: 'thread.subscribe', thread_id: selectedThread.id }))
+      subscribedThreadRef.current = selectedThread.id
+    }
+  }, [selectedThread?.id])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -66,7 +151,7 @@ export default function Messages() {
   async function loadThreads() {
     try {
       const response = await api.get('/message-threads/')
-      setThreads(response.data.results || response.data)
+      setThreads(sortThreads(response.data.results || response.data))
     } catch (error) {
       console.error('Failed to load message threads:', error)
     } finally {
@@ -77,9 +162,23 @@ export default function Messages() {
   async function loadMessages(threadId) {
     try {
       const response = await api.get(`/messages/?thread=${threadId}`)
-      setMessages(response.data.results || response.data)
+      setMessages(dedupeMessages(response.data.results || response.data))
     } catch (error) {
       console.error('Failed to load messages:', error)
+    }
+  }
+
+  async function markThreadRead(threadId, options = {}) {
+    try {
+      await api.post(`/message-threads/${threadId}/mark_read/`)
+      setThreads((prev) =>
+        prev.map((thread) => (thread.id === threadId ? { ...thread, unread_count: 0 } : thread))
+      )
+      setSelectedThread((prev) => (prev?.id === threadId ? { ...prev, unread_count: 0 } : prev))
+    } catch (error) {
+      if (!options.silent) {
+        console.error('Failed to mark thread as read:', error)
+      }
     }
   }
 
@@ -87,22 +186,32 @@ export default function Messages() {
     e.preventDefault()
     if (!newMessage.trim() || !selectedThread) return
 
+    const content = newMessage.trim()
+    setNewMessage('')
+
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(
+        JSON.stringify({
+          type: 'message.send',
+          thread_id: selectedThread.id,
+          content,
+        })
+      )
+      return
+    }
+
     setSending(true)
     try {
-      const response = await api.post(`/messages/`, {
+      const response = await api.post('/messages/', {
         thread: selectedThread.id,
-        content: newMessage,
+        content,
       })
-      setMessages([...messages, response.data])
-      setNewMessage('')
-      
-      // Mark thread as read
-      await api.post(`/message-threads/${selectedThread.id}/mark_read/`)
-      
-      // Refresh threads to update last message
+      setMessages((prev) => upsertMessage(prev, response.data))
+      await markThreadRead(selectedThread.id, { silent: true })
       loadThreads()
     } catch (error) {
       console.error('Failed to send message:', error)
+      setNewMessage(content)
       alert('Failed to send message. Please try again.')
     } finally {
       setSending(false)
@@ -126,14 +235,15 @@ export default function Messages() {
         subject: subject || undefined,
         initial_message: initialMessage,
       })
+      const thread = response.data
       setShowNewConversation(false)
       setSelectedParticipants([])
       setSubject('')
       setInitialMessage('')
       setSearchUsers('')
       setAvailableUsers([])
-      loadThreads()
-      setSelectedThread(response.data)
+      setThreads((prev) => sortThreads(upsertThread(prev, thread)))
+      setSelectedThread(thread)
     } catch (error) {
       console.error('Failed to start conversation:', error)
       alert('Failed to start conversation. Please try again.')
@@ -183,6 +293,12 @@ export default function Messages() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }
 
+  const selectedThreadTitle = useMemo(() => {
+    if (!selectedThread) return ''
+    const otherParticipants = selectedThread.participants_detail.filter((p) => !p.is_current_user)
+    return selectedThread.subject || otherParticipants.map((p) => p.name).join(', ')
+  }, [selectedThread])
+
   return (
     <PortalLayout>
       <div className="h-[calc(100vh-8rem)]">
@@ -191,6 +307,9 @@ export default function Messages() {
           <div>
             <h1 className="text-2xl font-bold text-text">Messages</h1>
             <p className="text-sm text-muted">Direct messaging with teachers and students</p>
+            <p className={`mt-1 text-xs ${socketConnected ? 'text-green-600' : 'text-amber-600'}`}>
+              {socketConnected ? 'Live updates connected' : 'Reconnecting live updates...'}
+            </p>
           </div>
           <Button onClick={() => setShowNewConversation(true)}>
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -378,7 +497,7 @@ export default function Messages() {
                             )}
                             {lastMessage && (
                               <p className="mt-1 truncate text-xs text-muted">
-                                {lastMessage.sender_name === user?.display_name || lastMessage.sender === user?.email ? 'You: ' : ''}
+                                {lastMessage.sender === user?.id || lastMessage.sender_email === user?.email ? 'You: ' : ''}
                                 {lastMessage.content}
                               </p>
                             )}
@@ -409,7 +528,7 @@ export default function Messages() {
                     </div>
                     <div>
                       <h2 className="text-base font-semibold text-text">
-                        {selectedThread.subject || selectedThread.participants_detail.filter(p => !p.is_current_user).map(p => p.name).join(', ')}
+                        {selectedThreadTitle}
                       </h2>
                       <p className="text-xs text-muted">
                         {selectedThread.participants_detail.filter(p => !p.is_current_user).map(p => p.name).join(', ')}
@@ -427,7 +546,7 @@ export default function Messages() {
                   ) : (
                     <div className="space-y-4">
                       {messages.map(message => {
-                        const isOwn = message.sender === user.email
+                        const isOwn = message.sender === user?.id || message.sender_email === user?.email
                         return (
                           <div
                             key={message.id}
@@ -504,5 +623,31 @@ export default function Messages() {
         </div>
       </div>
     </PortalLayout>
+  )
+}
+
+function dedupeMessages(items) {
+  const seen = new Set()
+  return (items || []).filter((item) => {
+    if (!item?.id || seen.has(item.id)) return false
+    seen.add(item.id)
+    return true
+  })
+}
+
+function upsertMessage(messages, message) {
+  const next = dedupeMessages([...(messages || []), message])
+  return next.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+}
+
+function upsertThread(threads, thread) {
+  const next = (threads || []).filter((item) => item.id !== thread.id)
+  next.unshift(thread)
+  return next
+}
+
+function sortThreads(threads) {
+  return [...(threads || [])].sort(
+    (a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
   )
 }

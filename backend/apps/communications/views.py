@@ -26,6 +26,12 @@ from .serializers import (
     FriendshipSerializer,
     FriendshipCreateSerializer,
 )
+from .services import (
+    broadcast_message_created,
+    broadcast_thread_updated,
+    create_message_for_thread,
+    get_or_create_thread_for_participants,
+)
 
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
@@ -329,7 +335,7 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
         # Users can only access threads they participate in
         return MessageThread.objects.filter(
             participants=self.request.user
-        ).prefetch_related('participants', 'messages')
+        ).prefetch_related('participants', 'participants__profile', 'messages', 'messages__sender')
 
     def perform_create(self, serializer):
         # Add current user as a participant when creating a thread
@@ -342,27 +348,26 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
         serializer = CreateMessageThreadSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        # Create thread
-        thread = MessageThread.objects.create(
-            subject=serializer.validated_data.get("subject", "")
-        )
-        thread.participants.add(request.user)
-        
-        # Add other participants
         from apps.accounts.models import User
         participants = User.objects.filter(id__in=serializer.validated_data["participant_ids"])
-        thread.participants.add(*participants)
-
-        # Create initial message
-        Message.objects.create(
+        thread, created = get_or_create_thread_for_participants(
+            current_user=request.user,
+            participant_ids=[participant.id for participant in participants],
+            subject=serializer.validated_data.get("subject", ""),
+        )
+        message = create_message_for_thread(
             thread=thread,
             sender=request.user,
-            content=serializer.validated_data["initial_message"]
+            content=serializer.validated_data["initial_message"],
         )
+        broadcast_message_created(thread, message)
 
         return Response(
-            MessageThreadSerializer(thread, context={"request": request}).data,
-            status=status.HTTP_201_CREATED
+            {
+                **MessageThreadSerializer(thread, context={"request": request}).data,
+                "created": created,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
     @action(detail=True, methods=["post"])
@@ -370,6 +375,7 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
         """Mark all messages in thread as read for current user."""
         thread = self.get_object()
         thread.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
+        broadcast_thread_updated(thread)
         return Response({"message": "Messages marked as read"})
 
 
@@ -382,13 +388,43 @@ class MessageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Users can only access messages from threads they participate in
         user_threads = MessageThread.objects.filter(participants=self.request.user)
-        return Message.objects.filter(thread__in=user_threads).select_related('sender', 'thread')
+        queryset = Message.objects.filter(thread__in=user_threads).select_related('sender', 'thread')
+        thread_id = self.request.query_params.get("thread")
+        if thread_id:
+            queryset = queryset.filter(thread_id=thread_id)
+        return queryset
 
-    def perform_create(self, serializer):
-        # Set sender to current user and update thread timestamp
-        message = serializer.save(sender=self.request.user)
-        message.thread.updated_at = timezone.now()
-        message.thread.save()
+    def create(self, request, *args, **kwargs):
+        thread_id = request.data.get("thread")
+        content = (request.data.get("content") or "").strip()
+
+        if not thread_id or not content:
+            return Response(
+                {"error": "thread and content are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            thread = MessageThread.objects.prefetch_related("participants").get(
+                id=thread_id,
+                participants=request.user,
+            )
+        except MessageThread.DoesNotExist:
+            return Response(
+                {"error": "Conversation not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        message = create_message_for_thread(
+            thread=thread,
+            sender=request.user,
+            content=content,
+        )
+        broadcast_message_created(thread, message)
+        return Response(
+            MessageSerializer(message, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):

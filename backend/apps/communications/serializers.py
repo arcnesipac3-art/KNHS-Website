@@ -217,6 +217,7 @@ class MessageThreadSerializer(serializers.ModelSerializer):
                 "name": user.display_name,
                 "email": user.email,
                 "role": user.role,
+                "avatar_url": getattr(getattr(user, "profile", None), "avatar_url", ""),
                 "is_current_user": request and request.user == user,
             })
         return participants
@@ -252,6 +253,8 @@ class CreateMessageThreadSerializer(serializers.Serializer):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             raise serializers.ValidationError("Authentication required")
+
+        value = list(dict.fromkeys(value))
 
         from apps.accounts.models import User
         users = User.objects.filter(id__in=value)
