@@ -381,7 +381,12 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
             sender=request.user,
             content=serializer.validated_data["initial_message"],
         )
-        broadcast_message_created(thread, message)
+        try:
+            broadcast_message_created(thread, message)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to broadcast message created: {e}")
 
         return Response(
             {
@@ -396,7 +401,13 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
         """Mark all messages in thread as read for current user."""
         thread = self.get_object()
         thread.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
-        broadcast_thread_updated(thread)
+        try:
+            broadcast_thread_updated(thread)
+        except Exception as e:
+            # Log but don't fail the request if broadcast fails
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to broadcast thread update: {e}")
         return Response({"message": "Messages marked as read"})
 
     @action(detail=True, methods=["delete"])
@@ -456,7 +467,12 @@ class MessageViewSet(viewsets.ModelViewSet):
             sender=request.user,
             content=content,
         )
-        broadcast_message_created(thread, message)
+        try:
+            broadcast_message_created(thread, message)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to broadcast message created: {e}")
         return Response(
             MessageSerializer(message, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
