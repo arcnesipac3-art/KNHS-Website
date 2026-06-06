@@ -1,3 +1,4 @@
+import logging
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
@@ -10,11 +11,16 @@ from .services import (
     serialize_thread_for_user,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class MessagesConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope.get("user")
+        logger.info(f"WebSocket connection attempt from user: {user}")
+
         if not user or not user.is_authenticated:
+            logger.warning("WebSocket connection rejected: user not authenticated")
             await self.close(code=4401)
             return
 
@@ -24,9 +30,11 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
 
         await self.channel_layer.group_add(self.user_room_name, self.channel_name)
         await self.accept()
+        logger.info(f"WebSocket connection accepted for user: {user}")
         await self.send_json({"type": "connection.ready"})
 
     async def disconnect(self, close_code):
+        logger.info(f"WebSocket disconnecting user: {self.user}, code: {close_code}")
         for thread_id in list(getattr(self, "subscribed_threads", set())):
             await self.channel_layer.group_discard(
                 get_thread_room_name(thread_id),
@@ -34,9 +42,11 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
             )
         if hasattr(self, "user_room_name"):
             await self.channel_layer.group_discard(self.user_room_name, self.channel_name)
+        logger.info(f"WebSocket disconnected for user: {self.user}")
 
     async def receive_json(self, content, **kwargs):
         event_type = content.get("type")
+        logger.info(f"WebSocket received event: {event_type} from user: {self.user}")
 
         if event_type == "thread.subscribe":
             await self.subscribe_thread(content.get("thread_id"))
@@ -54,6 +64,7 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
             await self.send_json({"type": "pong"})
             return
 
+        logger.warning(f"WebSocket received unsupported event type: {event_type}")
         await self.send_json(
             {
                 "type": "error",
@@ -63,21 +74,27 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
 
     async def subscribe_thread(self, thread_id):
         if not thread_id:
+            logger.warning("WebSocket subscribe_thread called without thread_id")
             return
 
+        logger.info(f"WebSocket user {self.user} subscribing to thread: {thread_id}")
+
         if not await self.user_has_thread_access(thread_id):
+            logger.warning(f"WebSocket user {self.user} denied access to thread: {thread_id}")
             await self.send_json({"type": "error", "message": "Conversation not found."})
             return
 
         room_name = get_thread_room_name(thread_id)
         await self.channel_layer.group_add(room_name, self.channel_name)
         self.subscribed_threads.add(str(thread_id))
+        logger.info(f"WebSocket user {self.user} subscribed to thread: {thread_id}")
         await self.send_json({"type": "thread.subscribed", "thread_id": str(thread_id)})
 
     async def unsubscribe_thread(self, thread_id):
         if not thread_id:
             return
 
+        logger.info(f"WebSocket user {self.user} unsubscribing from thread: {thread_id}")
         room_name = get_thread_room_name(thread_id)
         await self.channel_layer.group_discard(room_name, self.channel_name)
         self.subscribed_threads.discard(str(thread_id))
@@ -87,11 +104,15 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
         message_text = (content.get("content") or "").strip()
         client_id = content.get("client_id")
 
+        logger.info(f"WebSocket user {self.user} sending message to thread: {thread_id}")
+
         if not thread_id or not message_text:
+            logger.warning("WebSocket send_message missing required fields")
             await self.send_json({"type": "error", "message": "thread_id and content are required."})
             return
 
         if not await self.user_has_thread_access(thread_id):
+            logger.warning(f"WebSocket user {self.user} denied access to thread: {thread_id}")
             await self.send_json({"type": "error", "message": "Conversation not found."})
             return
 
@@ -116,7 +137,10 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
                 },
             )
 
+        logger.info(f"WebSocket message sent successfully for thread: {thread_id}")
+
     async def message_created(self, event):
+        logger.info(f"WebSocket message_created event for thread: {event['thread_id']}")
         await self.send_json(
             {
                 "type": "message.created",
@@ -127,6 +151,7 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
         )
 
     async def thread_updated(self, event):
+        logger.info(f"WebSocket thread_updated event for thread: {event['thread']['id']}")
         await self.send_json(
             {
                 "type": "thread.updated",
