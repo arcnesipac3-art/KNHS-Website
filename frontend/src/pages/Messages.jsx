@@ -27,8 +27,8 @@ export default function Messages() {
 
   async function loadThreads() {
     try {
-      const response = await api.get('/communications/message-threads/')
-      setThreads(response.data)
+      const response = await api.get('/message-threads/')
+      setThreads(response.data.results || response.data)
     } catch (error) {
       console.error('Failed to load message threads:', error)
     } finally {
@@ -38,8 +38,8 @@ export default function Messages() {
 
   async function loadMessages(threadId) {
     try {
-      const response = await api.get(`/communications/messages/?thread=${threadId}`)
-      setMessages(response.data)
+      const response = await api.get(`/messages/?thread=${threadId}`)
+      setMessages(response.data.results || response.data)
     } catch (error) {
       console.error('Failed to load messages:', error)
     }
@@ -51,7 +51,7 @@ export default function Messages() {
 
     setSending(true)
     try {
-      const response = await api.post(`/communications/messages/`, {
+      const response = await api.post(`/messages/`, {
         thread: selectedThread.id,
         content: newMessage,
       })
@@ -59,7 +59,7 @@ export default function Messages() {
       setNewMessage('')
       
       // Mark thread as read
-      await api.post(`/communications/message-threads/${selectedThread.id}/mark_read/`)
+      await api.post(`/message-threads/${selectedThread.id}/mark_read/`)
       
       // Refresh threads to update last message
       loadThreads()
@@ -79,7 +79,7 @@ export default function Messages() {
     const initialMessage = formData.get('initial_message')
 
     try {
-      const response = await api.post('/communications/message-threads/start_conversation/', {
+      const response = await api.post('/message-threads/start_conversation/', {
         participant_ids: participantIds,
         subject,
         initial_message,

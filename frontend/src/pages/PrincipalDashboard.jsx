@@ -20,7 +20,7 @@ export default function PrincipalDashboard() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const { data } = await api.get('/system/dashboard/')
+        const { data } = await api.get('/dashboard/')
         setDashboard(data)
 
         // Load stats

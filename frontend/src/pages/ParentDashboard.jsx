@@ -20,14 +20,14 @@ export default function ParentDashboard() {
 
   useEffect(() => {
     if (selectedChild) {
-      loadChildGrades(selectedChild.student_id)
-      loadChildAttendance(selectedChild.student_id)
+      loadChildGrades(selectedChild.student)
+      loadChildAttendance(selectedChild.student)
     }
   }, [selectedChild])
 
   async function loadChildren() {
     try {
-      const response = await api.get('/accounts/parent-student-links/my_children/')
+      const response = await api.get('/parent-student-links/my_children/')
       setChildren(response.data)
       if (response.data.length > 0) {
         setSelectedChild(response.data[0])
@@ -41,7 +41,7 @@ export default function ParentDashboard() {
 
   async function loadChildGrades(studentId) {
     try {
-      const response = await api.get(`/grading/grades/?student=${studentId}`)
+      const response = await api.get(`/grades/?student=${studentId}`)
       setChildGrades(response.data.results || response.data)
     } catch (error) {
       console.error('Failed to load child grades:', error)
@@ -50,7 +50,7 @@ export default function ParentDashboard() {
 
   async function loadChildAttendance(studentId) {
     try {
-      const response = await api.get(`/attendance/attendance/?student=${studentId}`)
+      const response = await api.get(`/attendance/?student=${studentId}`)
       setChildAttendance(response.data.results || response.data)
     } catch (error) {
       console.error('Failed to load child attendance:', error)
@@ -65,7 +65,7 @@ export default function ParentDashboard() {
     const relationshipOther = formData.get('relationship_other')
 
     try {
-      await api.post('/accounts/parent-student-links/request_link/', {
+      await api.post('/parent-student-links/request_link/', {
         student_id: studentId,
         relationship,
         relationship_other: relationshipOther,

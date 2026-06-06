@@ -37,7 +37,7 @@ export default function GuidanceDashboard() {
 
   async function loadCases() {
     try {
-      const response = await api.get('/communications/counseling-cases/')
+      const response = await api.get('/counseling-cases/')
       setCases(response.data.results || response.data)
     } catch (error) {
       console.error('Failed to load counseling cases:', error)
@@ -59,7 +59,7 @@ export default function GuidanceDashboard() {
     }
 
     try {
-      await api.post('/communications/counseling-cases/create_case/', data)
+      await api.post('/counseling-cases/create_case/', data)
       setShowCaseForm(false)
       loadCases()
     } catch (error) {
@@ -70,7 +70,7 @@ export default function GuidanceDashboard() {
 
   async function handleUpdateStatus(caseId, newStatus) {
     try {
-      await api.post(`/communications/counseling-cases/${caseId}/update_status/`, { status: newStatus })
+      await api.post(`/counseling-cases/${caseId}/update_status/`, { status: newStatus })
       loadCases()
     } catch (error) {
       console.error('Failed to update status:', error)
@@ -87,7 +87,7 @@ export default function GuidanceDashboard() {
     }
 
     try {
-      await api.post(`/communications/counseling-cases/${selectedCase.id}/add_note/`, data)
+      await api.post(`/counseling-cases/${selectedCase.id}/add_note/`, data)
       setShowNoteForm(false)
       loadCases()
     } catch (error) {
@@ -98,7 +98,7 @@ export default function GuidanceDashboard() {
 
   async function handleViewCaseNotes(caseId) {
     try {
-      const response = await api.get(`/communications/counseling-cases/${caseId}/notes/`)
+      const response = await api.get(`/counseling-cases/${caseId}/notes/`)
       const caseWithNotes = cases.find(c => c.id === caseId)
       if (caseWithNotes) {
         setSelectedCase({ ...caseWithNotes, notes: response.data })

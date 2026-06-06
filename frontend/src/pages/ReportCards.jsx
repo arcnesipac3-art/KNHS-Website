@@ -70,7 +70,7 @@ export default function ReportCards() {
       }
 
       try {
-        const response = await api.get('/grading/report-cards/')
+        const response = await api.get('/report-cards/')
         setReportCards(response.data.results || response.data)
       } catch (err) {
         console.error('Failed to load report cards:', err)
@@ -102,8 +102,10 @@ export default function ReportCards() {
       }
     }
 
-    loadStudents()
-  }, [selectedClassroom, selectedAcademicYear])
+    if (isTeacherOrAdmin) {
+      loadStudents()
+    }
+  }, [selectedClassroom, selectedAcademicYear, isTeacherOrAdmin])
 
   async function handleGenerateSF9(studentId) {
     setGenerating(studentId)
@@ -174,7 +176,7 @@ export default function ReportCards() {
       const selectedYearData = academicYears.find(y => y.id === selectedAcademicYear)
       const schoolYear = selectedYearData?.label || '2024-2025'
 
-      await api.post('/grading/report-cards/generate/', {
+      await api.post('/report-cards/generate/', {
         student_id: studentId,
         report_type: 'sf5',
         school_year: schoolYear,
@@ -200,7 +202,7 @@ export default function ReportCards() {
       const selectedYearData = academicYears.find(y => y.id === selectedAcademicYear)
       const schoolYear = selectedYearData?.label || '2024-2025'
 
-      await api.post('/grading/report-cards/generate/', {
+      await api.post('/report-cards/generate/', {
         student_id: studentId,
         report_type: 'sf10',
         school_year: schoolYear,
@@ -218,7 +220,7 @@ export default function ReportCards() {
 
   async function handleSignReportCard(reportCardId) {
     try {
-      await api.post(`/grading/report-cards/${reportCardId}/sign/`)
+      await api.post(`/report-cards/${reportCardId}/sign/`)
       setSuccessMessage('Report card signed successfully')
       loadReportCards()
     } catch (err) {
@@ -229,7 +231,7 @@ export default function ReportCards() {
 
   async function handleMarkPrinted(reportCardId) {
     try {
-      await api.post(`/grading/report-cards/${reportCardId}/mark_printed/`)
+      await api.post(`/report-cards/${reportCardId}/mark_printed/`)
       setSuccessMessage('Report card marked as printed')
       loadReportCards()
     } catch (err) {
@@ -244,7 +246,7 @@ export default function ReportCards() {
       return
     }
 
-    api.get('/grading/report-cards/')
+    api.get('/report-cards/')
       .then(response => {
         setReportCards(response.data.results || response.data)
       })

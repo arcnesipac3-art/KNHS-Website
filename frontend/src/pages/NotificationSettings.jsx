@@ -34,7 +34,7 @@ export default function NotificationSettings() {
 
   async function loadPreferences() {
     try {
-      const response = await api.get('/communications/notification-preferences/')
+      const response = await api.get('/notification-preferences/')
       setSettings(response.data)
     } catch (error) {
       console.error('Failed to load notification preferences:', error)
@@ -50,7 +50,7 @@ export default function NotificationSettings() {
   async function handleSave() {
     setLoading(true)
     try {
-      await api.put('/communications/notification-preferences/', settings)
+      await api.put('/notification-preferences/', settings)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (error) {
