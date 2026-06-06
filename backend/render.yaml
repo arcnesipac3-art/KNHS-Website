@@ -17,3 +17,5 @@ services:
         value: False
       - key: RENDER
         value: true
+      - key: REDIS_URL
+        sync: false
