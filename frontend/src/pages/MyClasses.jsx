@@ -11,6 +11,9 @@ export default function MyClasses() {
   const [classes, setClasses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [gradeFilter, setGradeFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('name')
 
   const isStudent = user?.role === 'student'
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin'
@@ -30,6 +33,31 @@ export default function MyClasses() {
     loadClasses()
   }, [])
 
+  // Filter and sort classes
+  const filteredClasses = classes
+    .filter((classItem) => {
+      const matchesSearch = classItem.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           classItem.section?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           classItem.strand?.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesGrade = gradeFilter === 'all' || classItem.grade_level === parseInt(gradeFilter)
+      return matchesSearch && matchesGrade
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name?.localeCompare(b.name)
+        case 'grade':
+          return (a.grade_level || 0) - (b.grade_level || 0)
+        case 'students':
+          return (b.student_count || 0) - (a.student_count || 0)
+        default:
+          return 0
+      }
+    })
+
+  // Get unique grade levels for filter
+  const gradeLevels = [...new Set(classes.map(c => c.grade_level))].sort((a, b) => a - b)
+
   if (loading) {
     return (
       <PortalLayout>
@@ -47,7 +75,7 @@ export default function MyClasses() {
     <PortalLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-text">My Classes</h1>
             <p className="mt-1 text-muted">
@@ -67,6 +95,61 @@ export default function MyClasses() {
           )}
         </div>
 
+        {/* Search and Filters */}
+        <Card>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            {/* Search Input */}
+            <div className="flex-1">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search classes by name, section, or strand..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-50"
+                />
+              </div>
+            </div>
+
+            {/* Grade Filter */}
+            <div className="flex-shrink-0">
+              <select
+                value={gradeFilter}
+                onChange={(e) => setGradeFilter(e.target.value)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-50"
+              >
+                <option value="all">All Grades</option>
+                {gradeLevels.map(grade => (
+                  <option key={grade} value={grade}>Grade {grade}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort */}
+            <div className="flex-shrink-0">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-50"
+              >
+                <option value="name">Sort by Name</option>
+                <option value="grade">Sort by Grade</option>
+                <option value="students">Sort by Students</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Results Count */}
+          {searchQuery || gradeFilter !== 'all' ? (
+            <div className="mt-3 text-sm text-muted">
+              Showing {filteredClasses.length} of {classes.length} classes
+            </div>
+          ) : null}
+        </Card>
+
         {/* Error State */}
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4">
@@ -80,9 +163,9 @@ export default function MyClasses() {
         )}
 
         {/* Classes Grid */}
-        {classes.length > 0 ? (
+        {filteredClasses.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {classes.map((classItem) => (
+            {filteredClasses.map((classItem) => (
               <ClassCard
                 key={classItem.id}
                 classData={classItem}
@@ -100,14 +183,16 @@ export default function MyClasses() {
                 </svg>
               </div>
               <h3 className="mt-4 text-lg font-medium text-text">
-                {isStudent ? 'No classes yet' : 'No classes assigned'}
+                {searchQuery || gradeFilter !== 'all' ? 'No classes match your search' : (isStudent ? 'No classes yet' : 'No classes assigned')}
               </h3>
               <p className="mt-2 text-sm text-muted">
-                {isStudent
-                  ? "You haven't joined any classes yet. Use a join code from your teacher to enroll."
-                  : 'No classes have been assigned to you yet. Contact your administrator.'}
+                {searchQuery || gradeFilter !== 'all'
+                  ? 'Try adjusting your search or filter criteria'
+                  : (isStudent
+                    ? "You haven't joined any classes yet. Use a join code from your teacher to enroll."
+                    : 'No classes have been assigned to you yet. Contact your administrator.')}
               </p>
-              {isStudent && (
+              {isStudent && !searchQuery && gradeFilter === 'all' && (
                 <div className="mt-6">
                   <Link to="/classes/join">
                     <Button>Join Your First Class</Button>
@@ -119,11 +204,12 @@ export default function MyClasses() {
         )}
 
         {/* Stats Footer */}
-        {classes.length > 0 && (
+        {filteredClasses.length > 0 && (
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted">
-                {isStudent ? 'Enrolled in' : 'Teaching'} {classes.length} {classes.length === 1 ? 'class' : 'classes'}
+                {isStudent ? 'Enrolled in' : 'Teaching'} {filteredClasses.length} {filteredClasses.length === 1 ? 'class' : 'classes'}
+                {searchQuery || gradeFilter !== 'all' ? ` (filtered from ${classes.length} total)` : ''}
               </span>
               <span className="text-muted">
                 Current Academic Year: SY {new Date().getFullYear()}-{new Date().getFullYear() + 1}
@@ -215,6 +301,14 @@ function ClassCard({ classData, isTeacher }) {
             </div>
           )}
         </div>
+
+        {/* Activity Indicator */}
+        {classData.updated_at && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted">
+            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+            <span>Active</span>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
