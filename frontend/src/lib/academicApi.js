@@ -345,7 +345,7 @@ export async function getClassroomDetails(classroomId) {
  * Get all teachers for classroom assignment
  */
 export async function getTeachers() {
-  const { data } = await api.get('/accounts/users/', { params: { role: 'teacher' } })
+  const { data } = await api.get('/users/', { params: { role: 'teacher' } })
   return Array.isArray(data) ? data : (data?.results ?? [])
 }
 
@@ -353,7 +353,7 @@ export async function getTeachers() {
  * Get all students for enrollment
  */
 export async function getStudents(filters = {}) {
-  const { data } = await api.get('/accounts/users/', { params: { role: 'student', ...filters } })
+  const { data } = await api.get('/users/', { params: { role: 'student', ...filters } })
   return Array.isArray(data) ? data : (data?.results ?? [])
 }
 
