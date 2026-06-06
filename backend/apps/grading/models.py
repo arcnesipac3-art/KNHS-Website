@@ -274,3 +274,67 @@ class ConductRating(models.Model):
 
     def __str__(self):
         return f"{self.class_enrollment.student.display_name} - {self.get_core_value_display()} Q{self.quarter.number}"
+
+
+class ReportCard(models.Model):
+    """Generated SF5 (Report Card) and SF10 (Form 137) records."""
+
+    REPORT_TYPE_CHOICES = [
+        ("sf5", "SF5 - Report Card"),
+        ("sf10", "SF10 - Form 137"),
+    ]
+
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("generated", "Generated"),
+        ("signed", "Signed"),
+        ("printed", "Printed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="report_cards",
+        limit_choices_to={"role": "student"}
+    )
+    report_type = models.CharField(max_length=10, choices=REPORT_TYPE_CHOICES)
+    school_year = models.CharField(max_length=20, help_text="e.g., 2024-2025")
+    quarter = models.ForeignKey(
+        Quarter,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="report_cards",
+        help_text="Required for SF5, null for SF10"
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="generated_report_cards"
+    )
+    generated_at = models.DateTimeField(null=True, blank=True)
+    signed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="signed_report_cards"
+    )
+    signed_at = models.DateTimeField(null=True, blank=True)
+    remarks = models.TextField(blank=True, help_text="Additional remarks or notes")
+    metadata = models.JSONField(default=dict, blank=True, help_text="Additional report data")
+
+    class Meta:
+        ordering = ["-generated_at"]
+        indexes = [
+            models.Index(fields=["student", "report_type", "-generated_at"]),
+            models.Index(fields=["school_year", "quarter"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_report_type_display()} - {self.student.display_name} ({self.school_year})"

@@ -6,6 +6,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { classroomApi, academicYearApi } from '../lib/academicApi'
 import { gradeApi } from '../lib/learningApi'
+import api from '../lib/api'
 
 export default function ReportCards() {
   const { user } = useAuth()
@@ -20,6 +21,8 @@ export default function ReportCards() {
   const [generating, setGenerating] = useState(null) // ID of student being generated
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
+  const [reportType, setReportType] = useState('sf9') // sf9, sf5, sf10
+  const [reportCards, setReportCards] = useState([])
 
   const isTeacherOrAdmin = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'principal'
 
@@ -57,6 +60,25 @@ export default function ReportCards() {
       loadData()
     }
   }, [isTeacherOrAdmin])
+
+  // Load report cards when report type changes
+  useEffect(() => {
+    async function loadReportCards() {
+      if (reportType === 'sf9') {
+        setReportCards([])
+        return
+      }
+
+      try {
+        const response = await api.get('/grading/report-cards/')
+        setReportCards(response.data.results || response.data)
+      } catch (err) {
+        console.error('Failed to load report cards:', err)
+      }
+    }
+
+    loadReportCards()
+  }, [reportType])
 
   // Load students when classroom changes
   useEffect(() => {
@@ -143,6 +165,94 @@ export default function ReportCards() {
     }
   }
 
+  async function handleGenerateSF5(studentId, quarterId) {
+    setGenerating(studentId)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const selectedYearData = academicYears.find(y => y.id === selectedAcademicYear)
+      const schoolYear = selectedYearData?.label || '2024-2025'
+
+      await api.post('/grading/report-cards/generate/', {
+        student_id: studentId,
+        report_type: 'sf5',
+        school_year: schoolYear,
+        quarter_id: quarterId,
+      })
+
+      setSuccessMessage('SF5 report card generated successfully')
+      loadReportCards()
+    } catch (err) {
+      console.error('Failed to generate SF5:', err)
+      setError(err.response?.data?.error || 'Failed to generate SF5 report card')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  async function handleGenerateSF10(studentId) {
+    setGenerating(studentId)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const selectedYearData = academicYears.find(y => y.id === selectedAcademicYear)
+      const schoolYear = selectedYearData?.label || '2024-2025'
+
+      await api.post('/grading/report-cards/generate/', {
+        student_id: studentId,
+        report_type: 'sf10',
+        school_year: schoolYear,
+      })
+
+      setSuccessMessage('SF10 permanent record generated successfully')
+      loadReportCards()
+    } catch (err) {
+      console.error('Failed to generate SF10:', err)
+      setError(err.response?.data?.error || 'Failed to generate SF10 permanent record')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  async function handleSignReportCard(reportCardId) {
+    try {
+      await api.post(`/grading/report-cards/${reportCardId}/sign/`)
+      setSuccessMessage('Report card signed successfully')
+      loadReportCards()
+    } catch (err) {
+      console.error('Failed to sign report card:', err)
+      setError(err.response?.data?.error || 'Failed to sign report card')
+    }
+  }
+
+  async function handleMarkPrinted(reportCardId) {
+    try {
+      await api.post(`/grading/report-cards/${reportCardId}/mark_printed/`)
+      setSuccessMessage('Report card marked as printed')
+      loadReportCards()
+    } catch (err) {
+      console.error('Failed to mark report card as printed:', err)
+      setError('Failed to mark report card as printed')
+    }
+  }
+
+  function loadReportCards() {
+    if (reportType === 'sf9') {
+      setReportCards([])
+      return
+    }
+
+    api.get('/grading/report-cards/')
+      .then(response => {
+        setReportCards(response.data.results || response.data)
+      })
+      .catch(err => {
+        console.error('Failed to load report cards:', err)
+      })
+  }
+
   const selectedClassroomData = classrooms.find(c => c.id === selectedClassroom)
   const selectedYearData = academicYears.find(y => y.id === selectedAcademicYear)
 
@@ -152,13 +262,49 @@ export default function ReportCards() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-text">SF9 Report Cards</h1>
-            <p className="mt-2 text-muted">Generate official DepEd Form 138 report cards for students</p>
+            <h1 className="text-3xl font-bold text-text">Report Cards</h1>
+            <p className="mt-2 text-muted">Generate official DepEd report cards (SF5, SF9, SF10) for students</p>
           </div>
           <Button variant="secondary" onClick={() => navigate(-1)}>
             Back
           </Button>
         </div>
+
+        {/* Report Type Tabs */}
+        <Card>
+          <div className="flex gap-4 border-b border-gray-200">
+            <button
+              onClick={() => setReportType('sf9')}
+              className={`px-4 py-2 font-medium ${
+                reportType === 'sf9'
+                  ? 'border-b-2 border-knhs-purple text-knhs-purple'
+                  : 'text-muted hover:text-text'
+              }`}
+            >
+              SF9 (Form 138)
+            </button>
+            <button
+              onClick={() => setReportType('sf5')}
+              className={`px-4 py-2 font-medium ${
+                reportType === 'sf5'
+                  ? 'border-b-2 border-knhs-purple text-knhs-purple'
+                  : 'text-muted hover:text-text'
+              }`}
+            >
+              SF5 (Report Card)
+            </button>
+            <button
+              onClick={() => setReportType('sf10')}
+              className={`px-4 py-2 font-medium ${
+                reportType === 'sf10'
+                  ? 'border-b-2 border-knhs-purple text-knhs-purple'
+                  : 'text-muted hover:text-text'
+              }`}
+            >
+              SF10 (Form 137)
+            </button>
+          </div>
+        </Card>
 
         {/* Success Message */}
         {successMessage && (
@@ -347,7 +493,7 @@ export default function ReportCards() {
         )}
 
         {/* Help Text */}
-        {!selectedClassroom && (
+        {!selectedClassroom && reportType === 'sf9' && (
           <Card>
             <div className="py-12 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-purple-100">
@@ -395,6 +541,73 @@ export default function ReportCards() {
                 </ul>
               </div>
             </div>
+          </Card>
+        )}
+
+        {/* SF5/SF10 Report Cards List */}
+        {reportType !== 'sf9' && (
+          <Card title={`${reportType === 'sf5' ? 'SF5' : 'SF10'} Report Cards`} subtitle="Generated report cards">
+            {reportCards.length === 0 ? (
+              <p className="py-8 text-center text-muted">No report cards generated yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="px-4 py-2 text-left text-sm font-medium text-text">Student</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-text">Type</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-text">School Year</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-text">Quarter</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-text">Status</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-text">Generated</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-text">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportCards.map(card => (
+                      <tr key={card.id} className="border-b border-gray-100">
+                        <td className="px-4 py-3 text-sm text-text">{card.student_name}</td>
+                        <td className="px-4 py-3 text-sm text-text">{card.report_type_display}</td>
+                        <td className="px-4 py-3 text-sm text-text">{card.school_year}</td>
+                        <td className="px-4 py-3 text-sm text-text">{card.quarter_name || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-medium ${
+                              card.status === 'generated'
+                                ? 'bg-blue-100 text-blue-800'
+                                : card.status === 'signed'
+                                ? 'bg-green-100 text-green-800'
+                                : card.status === 'printed'
+                                ? 'bg-gray-100 text-gray-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}
+                          >
+                            {card.status_display}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted">
+                          {card.generated_at ? new Date(card.generated_at).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <div className="flex gap-2">
+                            {card.status === 'generated' && (user.role === 'admin' || user.role === 'principal') && (
+                              <Button size="sm" variant="secondary" onClick={() => handleSignReportCard(card.id)}>
+                                Sign
+                              </Button>
+                            )}
+                            {card.status === 'signed' && (
+                              <Button size="sm" variant="secondary" onClick={() => handleMarkPrinted(card.id)}>
+                                Mark Printed
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         )}
       </div>

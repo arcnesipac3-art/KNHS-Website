@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Grade, GradePublishEvent, ConductRating, GradeReviewComment
+from .models import Grade, GradePublishEvent, ConductRating, GradeReviewComment, ReportCard
 
 
 class GradeSerializer(serializers.ModelSerializer):
@@ -180,3 +180,68 @@ class GradeReviewCommentInputSerializer(serializers.Serializer):
     quarter_id = serializers.UUIDField()
     comment = serializers.CharField(min_length=10, max_length=2000)
     is_internal = serializers.BooleanField(default=False)
+
+
+class ReportCardSerializer(serializers.ModelSerializer):
+    """Serializer for SF5/SF10 report cards."""
+
+    student_name = serializers.CharField(source="student.display_name", read_only=True)
+    student_lrn = serializers.CharField(source="student.profile.lrn", read_only=True)
+    student_grade_level = serializers.IntegerField(source="student.profile.grade_level", read_only=True)
+    student_strand = serializers.CharField(source="student.profile.strand", read_only=True)
+    generated_by_name = serializers.CharField(source="generated_by.display_name", read_only=True)
+    signed_by_name = serializers.CharField(source="signed_by.display_name", read_only=True)
+    report_type_display = serializers.CharField(source="get_report_type_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    quarter_name = serializers.CharField(source="quarter.name", read_only=True)
+
+    class Meta:
+        model = ReportCard
+        fields = [
+            "id",
+            "student",
+            "student_name",
+            "student_lrn",
+            "student_grade_level",
+            "student_strand",
+            "report_type",
+            "report_type_display",
+            "school_year",
+            "quarter",
+            "quarter_name",
+            "status",
+            "status_display",
+            "generated_by",
+            "generated_by_name",
+            "generated_at",
+            "signed_by",
+            "signed_by_name",
+            "signed_at",
+            "remarks",
+            "metadata",
+        ]
+        read_only_fields = ["id", "generated_at", "signed_at"]
+
+
+class CreateReportCardSerializer(serializers.Serializer):
+    """Serializer for creating a new report card."""
+
+    student_id = serializers.UUIDField()
+    report_type = serializers.ChoiceField(choices=ReportCard.REPORT_TYPE_CHOICES)
+    school_year = serializers.CharField(max_length=20)
+    quarter_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_student_id(self, value):
+        """Validate that the student exists."""
+        from apps.accounts.models import User
+        try:
+            student = User.objects.get(id=value, role="student")
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Student not found")
+        return value
+
+    def validate(self, data):
+        """Validate that SF5 requires a quarter."""
+        if data.get("report_type") == "sf5" and not data.get("quarter_id"):
+            raise serializers.ValidationError("quarter_id is required for SF5 (Report Card)")
+        return data

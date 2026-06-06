@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from apps.academics.models import ClassEnrollment, ClassSubject, Quarter, AcademicYear
 from apps.academics.permissions import IsAdminOrPrincipal, IsAdminUser, IsTeacherUser
 from apps.communications.models import Notification
-from .models import Grade, GradePublishEvent, ConductRating, GradeReviewComment
+from .models import Grade, GradePublishEvent, ConductRating, GradeReviewComment, ReportCard
 from .pagination import GradePagination
 from .reports import SF9Generator
 from .sf9_generator import SF9Generator as NewSF9Generator, generate_class_sf9_batch
@@ -27,6 +27,8 @@ from .serializers import (
     BulkGradeWorkflowSerializer,
     GradeReviewCommentSerializer,
     GradeReviewCommentInputSerializer,
+    ReportCardSerializer,
+    CreateReportCardSerializer,
 )
 
 
@@ -1128,4 +1130,86 @@ class ConductRatingViewSet(viewsets.ModelViewSet):
                 "created": created_count,
                 "updated": updated_count,
             }
+        )
+
+
+class ReportCardViewSet(viewsets.ModelViewSet):
+    """SF5/SF10 report card management."""
+
+    serializer_class = ReportCardSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter queryset based on user role."""
+        user = self.request.user
+        
+        if user.role in ["admin", "principal", "guidance", "registrar"]:
+            # Admin, principal, guidance, and registrar can see all report cards
+            return ReportCard.objects.select_related('student', 'student__profile', 'quarter', 'generated_by', 'signed_by').all()
+        elif user.role == "teacher":
+            # Teachers can see report cards for their students
+            return ReportCard.objects.filter(
+                student__profile__grade_level__in=[7, 8, 9, 10, 11, 12]
+            ).select_related('student', 'student__profile', 'quarter', 'generated_by', 'signed_by')
+        elif user.role == "student":
+            # Students can only see their own report cards
+            return ReportCard.objects.filter(student=user).select_related('student', 'student__profile', 'quarter', 'generated_by', 'signed_by')
+        else:
+            # Other roles cannot see report cards
+            return ReportCard.objects.none()
+
+    def perform_create(self, serializer):
+        """Set generated_by to current user on create."""
+        serializer.save(generated_by=self.request.user, generated_at=timezone.now())
+
+    @action(detail=False, methods=['post'])
+    def generate(self, request):
+        """Generate a new report card."""
+        serializer = CreateReportCardSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        # Create the report card
+        report_card = ReportCard.objects.create(
+            student_id=serializer.validated_data['student_id'],
+            report_type=serializer.validated_data['report_type'],
+            school_year=serializer.validated_data['school_year'],
+            quarter_id=serializer.validated_data.get('quarter_id'),
+            generated_by=request.user,
+            generated_at=timezone.now(),
+            status='generated',
+        )
+
+        return Response(
+            ReportCardSerializer(report_card, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def sign(self, request, pk=None):
+        """Sign a report card (admin/principal only)."""
+        if request.user.role not in ["admin", "principal"]:
+            return Response(
+                {"error": "Only admin and principal can sign report cards"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        report_card = self.get_object()
+        report_card.signed_by = request.user
+        report_card.signed_at = timezone.now()
+        report_card.status = "signed"
+        report_card.save()
+
+        return Response(
+            ReportCardSerializer(report_card, context={'request': request}).data
+        )
+
+    @action(detail=True, methods=['post'])
+    def mark_printed(self, request, pk=None):
+        """Mark report card as printed."""
+        report_card = self.get_object()
+        report_card.status = "printed"
+        report_card.save()
+
+        return Response(
+            ReportCardSerializer(report_card, context={'request': request}).data
         )
