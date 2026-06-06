@@ -163,7 +163,7 @@ export default function PortalLayout({ children }) {
     <div className="min-h-screen bg-background">
       <DepEdHeader compact />
       <div className="flex min-h-[calc(100vh-36px)]">
-        <aside className="hidden w-64 shrink-0 flex-col border-r border-gray-200 bg-white md:flex">
+        <aside className="fixed left-0 top-[36px] hidden h-[calc(100vh-36px)] w-64 shrink-0 flex-col border-r border-gray-200 bg-white md:flex md:overflow-hidden">
           <div className="border-b border-gray-100 px-5 py-5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-knhs-purple text-sm font-bold text-white">
               KN
@@ -171,7 +171,7 @@ export default function PortalLayout({ children }) {
             <h1 className="mt-3 text-sm font-bold text-knhs-purple">{school.shortName}</h1>
             <p className="text-xs text-muted">{school.tagline}</p>
           </div>
-          <nav className="flex-1 space-y-1 px-3 py-4">
+          <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
             {navItems.map((section) => (
               <div key={section.section} className="mb-4">
                 <h3 className="px-3 text-xs font-semibold uppercase tracking-wider text-muted">
@@ -205,7 +205,7 @@ export default function PortalLayout({ children }) {
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col md:ml-64">
           <header className="flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2 sm:px-4 sm:py-3 md:px-6">
             <div className="flex items-center gap-2 sm:gap-3">
               <button
@@ -242,7 +242,7 @@ export default function PortalLayout({ children }) {
               </Link>
             </div>
           </header>
-          <main className="flex-1 p-3 sm:p-4 md:p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">{children}</main>
         </div>
 
         {/* Mobile Menu Overlay */}
