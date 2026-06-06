@@ -1,5 +1,5 @@
 from django.core.cache import cache
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -333,10 +333,8 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Users can only access threads they participate in.
-        # Annotate last-message fields so the thread list does not trigger
-        # one query per conversation in the serializer.
+        # Simplified query to avoid Subquery issues
         user = self.request.user
-        latest_message = Message.objects.filter(thread=OuterRef("pk")).order_by("-created_at")
         return (
             MessageThread.objects.filter(participants=user)
             .prefetch_related("participants", "participants__profile")
@@ -345,12 +343,6 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
                     "messages",
                     filter=Q(messages__is_read=False) & ~Q(messages__sender=user),
                 ),
-                last_message_id=Subquery(latest_message.values("id")[:1]),
-                last_message_content=Subquery(latest_message.values("content")[:1]),
-                last_message_created_at=Subquery(latest_message.values("created_at")[:1]),
-                last_message_sender_id=Subquery(latest_message.values("sender_id")[:1]),
-                last_message_sender_name=Subquery(latest_message.values("sender__display_name")[:1]),
-                last_message_sender_email=Subquery(latest_message.values("sender__email")[:1]),
             )
         )
 
