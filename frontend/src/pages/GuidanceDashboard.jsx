@@ -22,10 +22,14 @@ export default function GuidanceDashboard() {
   const [selectedCase, setSelectedCase] = useState(null)
   const [showCaseForm, setShowCaseForm] = useState(false)
   const [showNoteForm, setShowNoteForm] = useState(false)
+  const [studentAlerts, setStudentAlerts] = useState([])
+  const [recentNotes, setRecentNotes] = useState([])
 
   useEffect(() => {
     loadStudents()
     loadCases()
+    loadStudentAlerts()
+    loadRecentNotes()
   }, [])
 
   async function loadStudents() {
@@ -41,6 +45,24 @@ export default function GuidanceDashboard() {
       setCases(response.data.results || response.data)
     } catch (error) {
       console.error('Failed to load counseling cases:', error)
+    }
+  }
+
+  async function loadStudentAlerts() {
+    try {
+      const response = await api.get('/attendance/student-alerts/')
+      setStudentAlerts(response.data.results || response.data || [])
+    } catch (error) {
+      console.error('Failed to load student alerts:', error)
+    }
+  }
+
+  async function loadRecentNotes() {
+    try {
+      const response = await api.get('/counseling-cases/recent_notes/')
+      setRecentNotes(response.data.results || response.data || [])
+    } catch (error) {
+      console.error('Failed to load recent notes:', error)
     }
   }
 
@@ -157,8 +179,22 @@ export default function GuidanceDashboard() {
           <p className="mt-1 text-purple-200">Student Support & Case Management</p>
         </div>
 
+        {/* Quick Actions */}
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => setShowCaseForm(true)}>Create New Case</Button>
+          <Link to="/students">
+            <Button variant="secondary">Student Lookup</Button>
+          </Link>
+          <Link to="/counseling-cases">
+            <Button variant="secondary">View All Cases</Button>
+          </Link>
+          <Link to="/reports">
+            <Button variant="secondary">Generate Reports</Button>
+          </Link>
+        </div>
+
         {/* KPI cards */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <Card className="border-l-4 border-l-blue-500">
             <p className="text-2xl font-bold text-text">{students.length}</p>
             <p className="text-sm text-muted">Total Students</p>
@@ -168,110 +204,310 @@ export default function GuidanceDashboard() {
             <p className="text-sm text-muted">Active Students</p>
           </Card>
           <Card className="border-l-4 border-l-red-500">
-            <p className="text-2xl font-bold text-text">{students.filter(s => !s.is_active).length}</p>
-            <p className="text-sm text-muted">Inactive Accounts</p>
+            <p className="text-2xl font-bold text-text">{openCases}</p>
+            <p className="text-sm text-muted">Open Cases</p>
+          </Card>
+          <Card className="border-l-4 border-l-amber-500">
+            <p className="text-2xl font-bold text-text">{studentAlerts.length}</p>
+            <p className="text-sm text-muted">Student Alerts</p>
           </Card>
         </div>
 
-        {/* Counseling Cases Section */}
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-text">Counseling Cases</h2>
-            <Button onClick={() => setShowCaseForm(true)}>Create New Case</Button>
-          </div>
-          <div className="mb-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-blue-50 p-3">
-              <p className="text-2xl font-bold text-blue-700">{openCases}</p>
-              <p className="text-sm text-blue-600">Open Cases</p>
-            </div>
-            <div className="rounded-lg bg-amber-50 p-3">
-              <p className="text-2xl font-bold text-amber-700">{inProgressCases}</p>
-              <p className="text-sm text-amber-600">In Progress</p>
-            </div>
-            <div className="rounded-lg bg-green-50 p-3">
-              <p className="text-2xl font-bold text-green-700">{resolvedCases}</p>
-              <p className="text-sm text-green-600">Resolved</p>
-            </div>
-          </div>
-          {cases.length === 0 ? (
-            <p className="py-8 text-center text-muted">No counseling cases found.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Student</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Title</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Type</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Severity</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Status</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Created</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cases.map(case_ => (
-                    <tr key={case_.id} className="border-b border-gray-100">
-                      <td className="px-4 py-3 text-sm text-text">{case_.student_name}</td>
-                      <td className="px-4 py-3 text-sm text-text">{case_.title}</td>
-                      <td className="px-4 py-3 text-sm text-text">{case_.case_type_display}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs font-medium ${
-                            case_.severity === 'urgent'
-                              ? 'bg-red-100 text-red-800'
-                              : case_.severity === 'high'
-                              ? 'bg-orange-100 text-orange-800'
-                              : case_.severity === 'medium'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {case_.severity_display}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs font-medium ${
-                            case_.status === 'open'
-                              ? 'bg-blue-100 text-blue-800'
-                              : case_.status === 'in_progress'
-                              ? 'bg-amber-100 text-amber-800'
-                              : case_.status === 'resolved'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {case_.status_display}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted">
-                        {new Date(case_.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => handleViewCaseNotes(case_.id)}>
-                            View
-                          </Button>
-                          <select
-                            value={case_.status}
-                            onChange={e => handleUpdateStatus(case_.id, e.target.value)}
-                            className="rounded border border-gray-300 px-2 py-1 text-xs"
-                          >
-                            <option value="open">Open</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="closed">Closed</option>
-                          </select>
-                        </div>
-                      </td>
-                    </tr>
+        {/* Main Content */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column (2/3) */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Student Alerts */}
+            {studentAlerts?.length > 0 && (
+              <Card title="Student Alerts" subtitle="Attendance and performance issues">
+                <div className="space-y-3">
+                  {studentAlerts.slice(0, 5).map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`flex items-start justify-between rounded-lg border p-4 ${
+                        alert.alert_type === 'attendance' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <h4 className="font-medium text-text">{alert.student_name}</h4>
+                        <p className="text-sm text-muted">
+                          {alert.alert_type === 'attendance' ? 'Attendance Issue' : 'Performance Alert'}
+                        </p>
+                        <p className="text-sm text-muted">{alert.message}</p>
+                      </div>
+                      <Link to={`/students/${alert.student_id}`}>
+                        <Button size="sm" variant="secondary">View</Button>
+                      </Link>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+                  {studentAlerts.length > 5 && (
+                    <Link to="/students" className="block text-center text-sm text-purple-600 hover:underline">
+                      View all {studentAlerts.length} alerts →
+                    </Link>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* Counseling Cases Section */}
+            <Card>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-text">Counseling Cases</h2>
+                <Button onClick={() => setShowCaseForm(true)}>Create New Case</Button>
+              </div>
+              <div className="mb-4 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-lg bg-blue-50 p-3">
+                  <p className="text-2xl font-bold text-blue-700">{openCases}</p>
+                  <p className="text-sm text-blue-600">Open Cases</p>
+                </div>
+                <div className="rounded-lg bg-amber-50 p-3">
+                  <p className="text-2xl font-bold text-amber-700">{inProgressCases}</p>
+                  <p className="text-sm text-amber-600">In Progress</p>
+                </div>
+                <div className="rounded-lg bg-green-50 p-3">
+                  <p className="text-2xl font-bold text-green-700">{resolvedCases}</p>
+                  <p className="text-sm text-green-600">Resolved</p>
+                </div>
+              </div>
+              {cases.length === 0 ? (
+                <p className="py-8 text-center text-muted">No counseling cases found.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="px-4 py-2 text-left text-sm font-medium text-text">Student</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-text">Title</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-text">Type</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-text">Severity</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-text">Status</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-text">Created</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-text">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cases.map(case_ => (
+                        <tr key={case_.id} className="border-b border-gray-100">
+                          <td className="px-4 py-3 text-sm text-text">{case_.student_name}</td>
+                          <td className="px-4 py-3 text-sm text-text">{case_.title}</td>
+                          <td className="px-4 py-3 text-sm text-text">{case_.case_type_display}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span
+                              className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                case_.severity === 'urgent'
+                                  ? 'bg-red-100 text-red-800'
+                                  : case_.severity === 'high'
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : case_.severity === 'medium'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {case_.severity_display}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span
+                              className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                case_.status === 'open'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : case_.status === 'in_progress'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : case_.status === 'resolved'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {case_.status_display}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted">
+                            {new Date(case_.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="secondary" onClick={() => handleViewCaseNotes(case_.id)}>
+                                View
+                              </Button>
+                              <select
+                                value={case_.status}
+                                onChange={e => handleUpdateStatus(case_.id, e.target.value)}
+                                className="rounded border border-gray-300 px-2 py-1 text-xs"
+                              >
+                                <option value="open">Open</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="closed">Closed</option>
+                              </select>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Right Column (1/3) */}
+          <div className="space-y-6">
+            {/* Recent Notes */}
+            {recentNotes?.length > 0 && (
+              <Card title="Recent Counseling Notes" subtitle="Latest case notes">
+                <div className="space-y-3">
+                  {recentNotes.slice(0, 5).map((note) => (
+                    <div key={note.id} className="rounded-lg border border-gray-200 p-3">
+                      <p className="text-sm font-medium text-text">{note.author_name}</p>
+                      <p className="mt-1 text-xs text-muted line-clamp-2">{note.note}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {new Date(note.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                  <Link
+                    to="/counseling-cases"
+                    className="block text-center text-sm text-purple-600 hover:underline"
+                  >
+                    View all →
+                  </Link>
+                </div>
+              </Card>
+            )}
+
+            {/* Student lookup */}
+            <Card title="Student Lookup" subtitle="Search and view student records">
+              <div className="mb-4 flex gap-3">
+                <input type="text" value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search by name, email, or LRN..."
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  <option value="all">All Grades</option>
+                  {[7,8,9,10,11,12].map(g => (
+                    <option key={g} value={g}>Grade {g}</option>
+                  ))}
+                </select>
+              </div>
+
+              {loading ? (
+                <div className="space-y-2">
+                  {[1,2,3].map(i => <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-200" />)}
+                </div>
+              ) : filtered.length === 0 ? (
+                <p className="py-8 text-center text-muted">No students found.</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                  {filtered.slice(0, 5).map(s => (
+                    <div key={s.id}
+                      className={`flex cursor-pointer items-center justify-between py-3 px-2 rounded-lg hover:bg-gray-50 ${selectedStudent?.id === s.id ? 'bg-purple-50' : ''}`}
+                      onClick={() => openStudentProfile(s)}>
+                      <div>
+                        <p className="font-medium text-text">{s.full_name || s.email}</p>
+                        <p className="text-xs text-muted">
+                          {s.grade_level ? `Grade ${s.grade_level}` : 'No grade'}
+                          {s.strand ? ` · ${s.strand}` : ''}
+                        </p>
+                      </div>
+                      <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  ))}
+                  {filtered.length > 5 && (
+                    <Link to="/students" className="block text-center text-sm text-purple-600 hover:underline">
+                      View all students →
+                    </Link>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            {/* Student profile panel */}
+            {selectedStudent ? (
+              <>
+                <Card title="Student Profile">
+                  <div className="space-y-3">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-100 text-xl font-bold text-knhs-purple">
+                      {(selectedStudent.full_name || selectedStudent.email || '?')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-text">{selectedStudent.full_name || '—'}</p>
+                      <p className="text-sm text-muted">{selectedStudent.email}</p>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      {selectedStudent.grade_level && (
+                        <p><span className="text-muted">Grade:</span> {selectedStudent.grade_level}
+                          {selectedStudent.strand ? ` · ${selectedStudent.strand}` : ''}</p>
+                      )}
+                      {selectedStudent.lrn && (
+                        <p><span className="text-muted">LRN:</span> <span className="font-mono">{selectedStudent.lrn}</span></p>
+                      )}
+                    </div>
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      selectedStudent.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {selectedStudent.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </Card>
+
+                <Card title="Attendance (Last 90 Days)">
+                  {loadingRecords ? (
+                    <div className="h-20 animate-pulse rounded-lg bg-gray-200" />
+                  ) : studentRecords ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted">Attendance Rate</span>
+                        <span className={`font-bold ${
+                          studentRecords.rate >= 90 ? 'text-green-600' :
+                          studentRecords.rate >= 75 ? 'text-amber-600' : 'text-red-600'
+                        }`}>
+                          {studentRecords.rate != null ? `${studentRecords.rate}%` : 'No data'}
+                        </span>
+                      </div>
+                      {studentRecords.rate != null && (
+                        <div className="h-2 rounded-full bg-gray-200">
+                          <div className={`h-2 rounded-full ${
+                            studentRecords.rate >= 90 ? 'bg-green-500' :
+                            studentRecords.rate >= 75 ? 'bg-amber-500' : 'bg-red-500'
+                          }`} style={{ width: `${studentRecords.rate}%` }} />
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="text-center rounded-lg bg-green-50 p-2">
+                          <p className="font-bold text-green-700">{studentRecords.present}</p>
+                          <p className="text-xs text-muted">Present</p>
+                        </div>
+                        <div className="text-center rounded-lg bg-red-50 p-2">
+                          <p className="font-bold text-red-700">{studentRecords.absent}</p>
+                          <p className="text-xs text-muted">Absent</p>
+                        </div>
+                      </div>
+                      {studentRecords.rate < 75 && (
+                        <div className="rounded-lg border-l-4 border-red-500 bg-red-50 p-3 text-sm text-red-800">
+                          ⚠️ Below 75% attendance — follow up recommended
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted">No attendance data available.</p>
+                  )}
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <div className="py-8 text-center">
+                  <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <p className="mt-3 text-sm text-muted">Select a student to view their profile</p>
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
 
         {/* Case Form Modal */}
         {showCaseForm && (
@@ -474,147 +710,6 @@ export default function GuidanceDashboard() {
             </div>
           </Card>
         )}
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Student lookup */}
-          <div className="space-y-4 lg:col-span-2">
-            <Card title="Student Lookup" subtitle="Search and view student records">
-              <div className="mb-4 flex gap-3">
-                <input type="text" value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search by name, email, or LRN..."
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-                <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                  <option value="all">All Grades</option>
-                  {[7,8,9,10,11,12].map(g => (
-                    <option key={g} value={g}>Grade {g}</option>
-                  ))}
-                </select>
-              </div>
-
-              {loading ? (
-                <div className="space-y-2">
-                  {[1,2,3].map(i => <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-200" />)}
-                </div>
-              ) : filtered.length === 0 ? (
-                <p className="py-8 text-center text-muted">No students found.</p>
-              ) : (
-                <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
-                  {filtered.map(s => (
-                    <div key={s.id}
-                      className={`flex cursor-pointer items-center justify-between py-3 px-2 rounded-lg hover:bg-gray-50 ${selectedStudent?.id === s.id ? 'bg-purple-50' : ''}`}
-                      onClick={() => openStudentProfile(s)}>
-                      <div>
-                        <p className="font-medium text-text">{s.full_name || s.email}</p>
-                        <p className="text-xs text-muted">
-                          {s.grade_level ? `Grade ${s.grade_level}` : 'No grade'}
-                          {s.strand ? ` · ${s.strand}` : ''}
-                          {s.lrn ? ` · LRN: ${s.lrn}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          s.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {s.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
-
-          {/* Student profile panel */}
-          <div className="space-y-4">
-            {selectedStudent ? (
-              <>
-                <Card title="Student Profile">
-                  <div className="space-y-3">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-100 text-xl font-bold text-knhs-purple">
-                      {(selectedStudent.full_name || selectedStudent.email || '?')[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-text">{selectedStudent.full_name || '—'}</p>
-                      <p className="text-sm text-muted">{selectedStudent.email}</p>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      {selectedStudent.grade_level && (
-                        <p><span className="text-muted">Grade:</span> {selectedStudent.grade_level}
-                          {selectedStudent.strand ? ` · ${selectedStudent.strand}` : ''}</p>
-                      )}
-                      {selectedStudent.lrn && (
-                        <p><span className="text-muted">LRN:</span> <span className="font-mono">{selectedStudent.lrn}</span></p>
-                      )}
-                    </div>
-                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      selectedStudent.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedStudent.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                </Card>
-
-                <Card title="Attendance (Last 90 Days)">
-                  {loadingRecords ? (
-                    <div className="h-20 animate-pulse rounded-lg bg-gray-200" />
-                  ) : studentRecords ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted">Attendance Rate</span>
-                        <span className={`font-bold ${
-                          studentRecords.rate >= 90 ? 'text-green-600' :
-                          studentRecords.rate >= 75 ? 'text-amber-600' : 'text-red-600'
-                        }`}>
-                          {studentRecords.rate != null ? `${studentRecords.rate}%` : 'No data'}
-                        </span>
-                      </div>
-                      {studentRecords.rate != null && (
-                        <div className="h-2 rounded-full bg-gray-200">
-                          <div className={`h-2 rounded-full ${
-                            studentRecords.rate >= 90 ? 'bg-green-500' :
-                            studentRecords.rate >= 75 ? 'bg-amber-500' : 'bg-red-500'
-                          }`} style={{ width: `${studentRecords.rate}%` }} />
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-center rounded-lg bg-green-50 p-2">
-                          <p className="font-bold text-green-700">{studentRecords.present}</p>
-                          <p className="text-xs text-muted">Present</p>
-                        </div>
-                        <div className="text-center rounded-lg bg-red-50 p-2">
-                          <p className="font-bold text-red-700">{studentRecords.absent}</p>
-                          <p className="text-xs text-muted">Absent</p>
-                        </div>
-                      </div>
-                      {studentRecords.rate < 75 && (
-                        <div className="rounded-lg border-l-4 border-red-500 bg-red-50 p-3 text-sm text-red-800">
-                          ⚠️ Below 75% attendance — follow up recommended
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted">No attendance data available.</p>
-                  )}
-                </Card>
-              </>
-            ) : (
-              <Card>
-                <div className="py-8 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <p className="mt-3 text-sm text-muted">Select a student to view their profile</p>
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
       </div>
     </PortalLayout>
   )
