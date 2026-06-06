@@ -30,11 +30,11 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
 
         await self.channel_layer.group_add(self.user_room_name, self.channel_name)
         await self.accept()
-        logger.info(f"WebSocket connection accepted for user: {user}")
+        logger.info(f"WS connected to room {self.user_room_name}")
         await self.send_json({"type": "connection.ready"})
 
     async def disconnect(self, close_code):
-        logger.info(f"WebSocket disconnecting user: {self.user}, code: {close_code}")
+        logger.info(f"Chat WS disconnected {close_code}")
         for thread_id in list(getattr(self, "subscribed_threads", set())):
             await self.channel_layer.group_discard(
                 get_thread_room_name(thread_id),
@@ -42,7 +42,6 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
             )
         if hasattr(self, "user_room_name"):
             await self.channel_layer.group_discard(self.user_room_name, self.channel_name)
-        logger.info(f"WebSocket disconnected for user: {self.user}")
 
     async def receive_json(self, content, **kwargs):
         event_type = content.get("type")
@@ -87,7 +86,7 @@ class MessagesConsumer(AsyncJsonWebsocketConsumer):
         room_name = get_thread_room_name(thread_id)
         await self.channel_layer.group_add(room_name, self.channel_name)
         self.subscribed_threads.add(str(thread_id))
-        logger.info(f"WebSocket user {self.user} subscribed to thread: {thread_id}")
+        logger.info(f"WS connected to room {room_name}")
         await self.send_json({"type": "thread.subscribed", "thread_id": str(thread_id)})
 
     async def unsubscribe_thread(self, thread_id):

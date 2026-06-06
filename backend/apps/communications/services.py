@@ -10,11 +10,11 @@ from .serializers import MessageSerializer, MessageThreadSerializer
 
 
 def get_thread_room_name(thread_id):
-    return f"messages.thread.{thread_id}"
+    return f"thread_{thread_id}"
 
 
 def get_user_room_name(user_id):
-    return f"messages.user.{user_id}"
+    return f"user_{user_id}"
 
 
 def find_existing_thread_for_participants(current_user, participant_ids, subject=""):
