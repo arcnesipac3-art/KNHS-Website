@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
-import PortalLayout from '../components/layout/PortalLayout'
+import PortalLayout from '@/components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import Skeleton from '../components/ui/Skeleton'
 import { gradeApi } from '../lib/learningApi'
 import { quarterApi } from '../lib/academicApi'
 import GradeStatusBadge from '../components/ui/GradeStatusBadge'
@@ -511,11 +512,8 @@ export default function ApprovalCenter() {
         {/* Approval Queue */}
         <Card title="Pending Approvals" subtitle={selectedQuarterData ? selectedQuarterData.name : 'Select a quarter'}>
           {loading ? (
-            <div className="flex min-h-[200px] items-center justify-center">
-              <div className="text-center">
-                <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-purple-200 border-t-knhs-purple"></div>
-                <p className="mt-4 text-muted">Loading approvals...</p>
-              </div>
+            <div className="space-y-4">
+              <Skeleton variant="card" count={3} />
             </div>
           ) : approvalQueue.length === 0 ? (
             <div className="py-12 text-center">

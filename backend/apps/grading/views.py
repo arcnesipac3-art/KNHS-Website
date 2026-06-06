@@ -116,8 +116,10 @@ class GradeViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "batch_input", "submit_for_approval"]:
             return [IsTeacherUser()] if self.request.user.role == "teacher" else [IsAdminUser()]
-        if self.action in ["publish", "reject", "lock", "unlock", "approval_queue"]:
+        if self.action in ["publish", "reject", "lock", "approval_queue"]:
             return [IsAdminOrPrincipal()] if self.request.user.role == "principal" else [IsAdminUser()]
+        if self.action == "unlock":
+            return [IsAdminUser()]
         return [IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -419,7 +421,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             {"message": f"Returned {rejected_count} grades for revision", "count": rejected_count}
         )
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], throttle_scope="lock")
     def lock(self, request):
         """Lock published grades after release."""
         if request.user.role not in ["principal", "admin"]:
@@ -462,12 +464,12 @@ class GradeViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], throttle_scope="unlock")
     def unlock(self, request, pk=None):
         """Unlock a published grade for editing."""
-        if request.user.role not in ["principal", "admin"]:
+        if request.user.role != "admin":
             return Response(
-                {"error": "Only principals and admins can unlock grades"},
+                {"error": "Only admins can perform emergency grade unlocks"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -497,54 +499,60 @@ class GradeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def approval_queue(self, request):
         """Return grouped grade approval queue for principals/admins."""
-        grades = (
+        # Get unique combinations of class_subject and quarter with pending grades
+        pending_groups = (
             Grade.objects.filter(status="pending_approval")
-            .select_related(
-                "class_subject",
-                "class_subject__subject",
-                "class_subject__classroom",
-                "class_subject__teacher",
-                "quarter",
-                "class_enrollment__student",
-                "class_enrollment__student__profile",
-            )
-            .order_by("class_subject__classroom__name", "class_subject__subject__name", "quarter__number")
+            .values("class_subject", "quarter")
+            .annotate(latest_submitted_at=Max("publish_events__created_at"))
+            .order_by("-latest_submitted_at")
         )
 
         quarter_id = request.query_params.get("quarter")
         if quarter_id:
-            grades = grades.filter(quarter_id=quarter_id)
+            pending_groups = pending_groups.filter(quarter_id=quarter_id)
 
-        grouped = defaultdict(lambda: {"meta": None, "grades": [], "latest_submitted_at": None})
-        for grade in grades:
-            key = f"{grade.class_subject_id}:{grade.quarter_id}"
-            latest_event = grade.publish_events.filter(action="submitted").aggregate(latest=Max("created_at"))
-            latest_submitted_at = latest_event.get("latest")
-
-            if grouped[key]["meta"] is None:
-                grouped[key]["meta"] = {
-                    "class_subject_id": str(grade.class_subject_id),
-                    "quarter_id": str(grade.quarter_id),
-                    "classroom_name": grade.class_subject.classroom.name,
-                    "subject_name": grade.class_subject.subject.name,
-                    "teacher_name": grade.class_subject.teacher.display_name if grade.class_subject.teacher else "Unassigned",
-                    "quarter_name": grade.quarter.name,
-                }
-            grouped[key]["grades"].append(GradeSerializer(grade).data)
-            grouped[key]["latest_submitted_at"] = latest_submitted_at
+        # Apply pagination to the groups
+        page = self.paginate_queryset(pending_groups)
+        if page is not None:
+            pending_groups = page
 
         queue = []
-        for group in grouped.values():
-            queue.append(
-                {
-                    **group["meta"],
-                    "latest_submitted_at": group["latest_submitted_at"],
-                    "student_count": len(group["grades"]),
-                    "grades": group["grades"],
-                }
+        for group in pending_groups:
+            cs_id = group["class_subject"]
+            q_id = group["quarter"]
+            
+            # Fetch grades for this group
+            grades = Grade.objects.filter(
+                class_subject_id=cs_id,
+                quarter_id=q_id,
+                status="pending_approval"
+            ).select_related(
+                "class_subject__subject",
+                "class_subject__classroom",
+                "class_subject__teacher",
+                "quarter",
+                "class_enrollment__student"
             )
 
-        queue.sort(key=lambda item: item["latest_submitted_at"] or "", reverse=True)
+            if not grades.exists():
+                continue
+
+            first_grade = grades[0]
+            queue.append({
+                "class_subject_id": str(cs_id),
+                "quarter_id": str(q_id),
+                "classroom_name": first_grade.class_subject.classroom.name,
+                "subject_name": first_grade.class_subject.subject.name,
+                "teacher_name": first_grade.class_subject.teacher.display_name if first_grade.class_subject.teacher else "Unassigned",
+                "quarter_name": first_grade.quarter.name,
+                "latest_submitted_at": group["latest_submitted_at"],
+                "student_count": grades.count(),
+                "grades": GradeSerializer(grades, many=True).data,
+            })
+
+        if page is not None:
+            return self.get_paginated_response(queue)
+        
         return Response(queue)
 
     @action(detail=False, methods=["post"])
@@ -846,6 +854,11 @@ class GradeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def transmutation_table(self, request):
         """Return DepEd transmutation table for frontend use."""
+        cache_key = "deped_transmutation_table"
+        cached_table = cache.get(cache_key)
+        if cached_table:
+            return Response(cached_table)
+
         from .models import DEPED_TRANSMUTATION
         
         # Convert to list of dictionaries for easier frontend consumption
@@ -854,12 +867,15 @@ class GradeViewSet(viewsets.ModelViewSet):
             for initial, transmuted in sorted(DEPED_TRANSMUTATION.items(), reverse=True)
         ]
         
-        return Response({
+        response_data = {
             "table": table,
             "description": "DepEd Transmutation Table (Initial Grade → Transmuted Grade)",
             "passing_grade": 75,
             "grade_range": {"min": 60, "max": 100}
-        })
+        }
+        
+        cache.set(cache_key, response_data, timeout=86400) # Cache for 24 hours
+        return Response(response_data)
 
     @action(detail=False, methods=["get"])
     def generate_sf9_data(self, request):

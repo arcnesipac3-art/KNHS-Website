@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
-import PortalLayout from '../components/layout/PortalLayout'
+import PortalLayout from '@/components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { gradeApi } from '../lib/learningApi'

@@ -54,7 +54,7 @@ describe('Grade Approval Workflow Integration', () => {
     })
 
     // Click approve button
-    const approveButton = screen.getByRole('button', { name: /✅ approve/i })
+    const approveButton = screen.getByRole('button', { name: /✅ approve & publish/i })
     await user.click(approveButton)
 
     // Confirm approval
@@ -92,20 +92,20 @@ describe('Grade Approval Workflow Integration', () => {
     })
 
     // Open reject modal
-    const rejectButton = screen.getByRole('button', { name: /❌ reject/i })
+    const rejectButton = screen.getByRole('button', { name: /❌ reject for revision/i })
     await user.click(rejectButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/return for revision/i)).toBeInTheDocument()
+      expect(screen.getByText(/reject grades for revision/i)).toBeInTheDocument()
     })
 
     // Enter reason
-    const textarea = screen.getByPlaceholderText(/explain what needs/i)
+    const textarea = screen.getByPlaceholderText(/e\.g\., please review/i)
     const reason = 'Computation errors detected in final grade calculations'
     await user.type(textarea, reason)
 
     // Submit rejection
-    const submitButton = screen.getByRole('button', { name: /return to teacher/i })
+    const submitButton = screen.getByRole('button', { name: /reject grades/i })
     await user.click(submitButton)
 
     expect(window.confirm).toHaveBeenCalled()
@@ -138,7 +138,7 @@ describe('Grade Approval Workflow Integration', () => {
     })
 
     // Open lock modal
-    const lockButton = screen.getByRole('button', { name: /🔒 lock grades/i })
+    const lockButton = screen.getByRole('button', { name: /🔒 lock/i })
     await user.click(lockButton)
 
     await waitFor(() => {
@@ -180,20 +180,38 @@ describe('Grade Approval Error Handling', () => {
   })
 
   it('handles approval API errors gracefully', async () => {
-    const user = userEvent.setup()
-    window.confirm = vi.fn(() => true)
+    academicApi.quarterApi.getAll.mockResolvedValue({
+      data: [{ id: 'q1', name: 'Q1 2026-2027', is_active: true, number: 1 }]
+    })
     
+    learningApi.gradeApi.getApprovalQueue.mockRejectedValue(new Error('Failed to load queue'))
+
+    render(<ApprovalCenter />, { user: mockUsers.principal })
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load queue/i)).toBeInTheDocument()
+    })
+  })
+
+  it('handles already published error', async () => {
+    academicApi.quarterApi.getAll.mockResolvedValue({
+      data: [{ id: 'q1', name: 'Q1 2026-2027', is_active: true, number: 1 }]
+    })
+    learningApi.gradeApi.getApprovalQueue.mockResolvedValue({ data: [mockApprovalQueueItem] })
     learningApi.gradeApi.publish.mockRejectedValue({
       response: { data: { error: 'Grades already published' } }
     })
 
+    const user = userEvent.setup()
+    window.confirm = vi.fn(() => true)
+    
     render(<ApprovalCenter />, { user: mockUsers.principal })
 
     await waitFor(() => {
       expect(screen.getByText(/mathematics/i)).toBeInTheDocument()
     })
 
-    const approveButton = screen.getByRole('button', { name: /✅ approve/i })
+    const approveButton = screen.getByRole('button', { name: /✅ approve & publish/i })
     await user.click(approveButton)
 
     await waitFor(() => {
@@ -213,7 +231,7 @@ describe('Grade Approval Error Handling', () => {
       expect(screen.getByText(/mathematics/i)).toBeInTheDocument()
     })
 
-    const approveButton = screen.getByRole('button', { name: /✅ approve/i })
+    const approveButton = screen.getByRole('button', { name: /✅ approve & publish/i })
     await user.click(approveButton)
 
     await waitFor(() => {
@@ -227,7 +245,7 @@ describe('Grade Approval Error Handling', () => {
     render(<ApprovalCenter />, { user: mockUsers.principal })
 
     await waitFor(() => {
-      expect(screen.getByText(/no grades pending approval/i)).toBeInTheDocument()
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument()
     })
   })
 
@@ -256,7 +274,7 @@ describe('Grade Approval Permission Checks', () => {
     render(<ApprovalCenter />, { user: mockUsers.principal })
 
     await waitFor(() => {
-      expect(screen.getByText(/approval center/i)).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /approval center/i })).toBeInTheDocument()
     })
   })
 
@@ -269,7 +287,7 @@ describe('Grade Approval Permission Checks', () => {
     render(<ApprovalCenter />, { user: mockUsers.admin })
 
     await waitFor(() => {
-      expect(screen.getByText(/approval center/i)).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /approval center/i })).toBeInTheDocument()
     })
   })
 
@@ -284,7 +302,7 @@ describe('Grade Approval Permission Checks', () => {
     render(<ApprovalCenter />, { user: mockUsers.principal })
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /lock grades/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /🔒 lock/i })).toBeInTheDocument()
     })
   })
 })

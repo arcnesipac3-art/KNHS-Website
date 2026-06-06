@@ -148,6 +148,23 @@ class DashboardView(APIView):
             }, status=200)  # Return 200 with empty data instead of 500
 
 
+class AuditLogViewSet(viewsets.ViewSet):
+    """
+    Audit log endpoints (stub - returns empty data for now).
+    Admin only.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOrPrincipal]
+    
+    def list(self, request):
+        """Return audit logs (stub)."""
+        return Response({
+            'count': 0,
+            'next': None,
+            'previous': None,
+            'results': []
+        })
+
+
 class AnalyticsViewSet(viewsets.ViewSet):
     """
     Analytics and reporting endpoints.

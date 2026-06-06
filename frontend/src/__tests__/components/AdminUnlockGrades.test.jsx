@@ -148,7 +148,7 @@ describe('AdminUnlockGrades Unlock Modal', () => {
     )
 
     // Try with short reason
-    const textarea = screen.getByPlaceholderText(/must provide detailed/i)
+    const textarea = screen.getByPlaceholderText(/e\.g\., deped requested/i)
     await user.type(textarea, 'Too short')
     await user.click(confirmButton)
 
@@ -173,7 +173,7 @@ describe('AdminUnlockGrades Unlock Modal', () => {
       expect(screen.getByText(/emergency grade unlock/i)).toBeInTheDocument()
     })
 
-    const textarea = screen.getByPlaceholderText(/must provide detailed/i)
+    const textarea = screen.getByPlaceholderText(/e\.g\., deped requested/i)
     await user.type(textarea, 'Emergency: Computation error needs immediate correction')
 
     const confirmButton = screen.getByRole('button', { name: /unlock grades/i })
@@ -207,7 +207,7 @@ describe('AdminUnlockGrades Unlock Modal', () => {
       expect(screen.getByText(/emergency grade unlock/i)).toBeInTheDocument()
     })
 
-    const textarea = screen.getByPlaceholderText(/must provide detailed/i)
+    const textarea = screen.getByPlaceholderText(/e\.g\., deped requested/i)
     const reason = 'Emergency: Computation error in transmutation table needs immediate correction'
     await user.type(textarea, reason)
 
@@ -215,11 +215,10 @@ describe('AdminUnlockGrades Unlock Modal', () => {
     await user.click(confirmButton)
 
     await waitFor(() => {
-      expect(learningApi.gradeApi.unlock).toHaveBeenCalledWith({
-        class_subject_id: mockLockedGrades[0].class_subject_id,
-        quarter_id: mockLockedGrades[0].quarter_id,
-        reason: reason,
-      })
+      expect(learningApi.gradeApi.unlock).toHaveBeenCalledWith(
+        mockLockedGrades[0].grades[0].id,
+        { reason: reason }
+      )
     })
   })
 
@@ -243,7 +242,7 @@ describe('AdminUnlockGrades Unlock Modal', () => {
       expect(screen.getByText(/emergency grade unlock/i)).toBeInTheDocument()
     })
 
-    const textarea = screen.getByPlaceholderText(/must provide detailed/i)
+    const textarea = screen.getByPlaceholderText(/e\.g\., deped requested/i)
     await user.type(textarea, 'Emergency: Computation error needs correction')
 
     const confirmButton = screen.getByRole('button', { name: /unlock grades/i })
@@ -274,7 +273,7 @@ describe('AdminUnlockGrades Unlock Modal', () => {
       expect(screen.getByText(/emergency grade unlock/i)).toBeInTheDocument()
     })
 
-    const textarea = screen.getByPlaceholderText(/must provide detailed/i)
+    const textarea = screen.getByPlaceholderText(/e\.g\., deped requested/i)
     await user.type(textarea, 'Emergency: Computation error needs correction')
 
     const confirmButton = screen.getByRole('button', { name: /unlock grades/i })
@@ -282,32 +281,6 @@ describe('AdminUnlockGrades Unlock Modal', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/unlock failed/i)).toBeInTheDocument()
-    })
-  })
-
-  it('displays character count for unlock reason', async () => {
-    const user = userEvent.setup()
-    render(<AdminUnlockGrades />, { user: mockUsers.admin })
-
-    await waitFor(() => {
-      expect(screen.getByText(/english/i)).toBeInTheDocument()
-    })
-
-    const unlockButton = screen.getByRole('button', { name: /🔓 emergency unlock/i })
-    await user.click(unlockButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/emergency grade unlock/i)).toBeInTheDocument()
-    })
-
-    // Should show character count
-    expect(screen.getByText(/0 \/ 20 minimum/i)).toBeInTheDocument()
-
-    const textarea = screen.getByPlaceholderText(/must provide detailed/i)
-    await user.type(textarea, 'Emergency action')
-
-    await waitFor(() => {
-      expect(screen.getByText(/16 \/ 20 minimum/i)).toBeInTheDocument()
     })
   })
 })

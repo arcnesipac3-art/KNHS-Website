@@ -375,45 +375,8 @@ export const notificationApi = {
 }
 
 // ============================================================================
-// FRIENDSHIPS
+// CONVENIENCE FUNCTIONS
 // ============================================================================
-
-export const friendshipApi = {
-  /**
-   * Get all friendships for current user
-   */
-  getAll: () => api.get('/friendships/'),
-
-  /**
-   * Get accepted friends
-   */
-  getMyFriends: () => api.get('/friendships/my_friends/'),
-
-  /**
-   * Get pending friend requests
-   */
-  getPendingRequests: () => api.get('/friendships/pending_requests/'),
-
-  /**
-   * Send friend request
-   */
-  sendRequest: (data) => api.post('/friendships/', data),
-
-  /**
-   * Accept friend request
-   */
-  accept: (id) => api.post(`/friendships/${id}/accept/`),
-
-  /**
-   * Reject friend request
-   */
-  reject: (id) => api.post(`/friendships/${id}/reject/`),
-
-  /**
-   * Unfriend
-   */
-  unfriend: (id) => api.post(`/friendships/${id}/unfriend/`),
-}
 
 /**
  * Get all data for a class-subject

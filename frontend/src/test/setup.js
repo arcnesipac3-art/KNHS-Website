@@ -25,6 +25,19 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+// Mock PortalLayout to simplify component tests
+vi.mock('@/components/layout/PortalLayout', () => ({
+  __esModule: true,
+  default: ({ children, title }) => React.createElement(
+    'div', 
+    { 'data-testid': 'portal-layout' },
+    [
+      React.createElement('h1', { key: 'title' }, title),
+      children
+    ]
+  ),
+}))
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

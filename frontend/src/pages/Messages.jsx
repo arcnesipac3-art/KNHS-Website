@@ -95,6 +95,7 @@ export default function Messages() {
     if (!token) return undefined
 
     let cancelled = false
+    let reconnectAttempts = 0
 
     function connect() {
       const socket = new WebSocket(
@@ -105,6 +106,7 @@ export default function Messages() {
       socket.onopen = () => {
         if (cancelled) return
         setSocketConnected(true)
+        reconnectAttempts = 0
         if (selectedThreadRef.current?.id) {
           socket.send(
             JSON.stringify({
@@ -136,12 +138,20 @@ export default function Messages() {
         }
       }
 
-      socket.onclose = () => {
+      socket.onerror = (error) => {
+        if (cancelled) return
+        console.error('WebSocket error:', error)
+      }
+
+      socket.onclose = (event) => {
         if (cancelled) return
         setSocketConnected(false)
+        console.log('WebSocket closed:', event.code, event.reason)
         // Only reconnect if not intentionally closed
         if (!cancelled) {
-          reconnectTimeoutRef.current = window.setTimeout(connect, 2000)
+          reconnectAttempts += 1
+          const backoff = Math.min(2000 * Math.pow(1.5, reconnectAttempts - 1), 30000)
+          reconnectTimeoutRef.current = window.setTimeout(connect, backoff)
         }
       }
     }

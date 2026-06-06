@@ -150,26 +150,20 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-# Redis Configuration
+# Redis Configuration (for Channels/WebSockets only)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CHANNEL_REDIS_URL = os.getenv("CHANNEL_REDIS_URL") or (
     os.getenv("REDIS_URL") if os.getenv("REDIS_URL") and os.getenv("RENDER") else None
 )
 
-# Cache Configuration
+# Cache configuration
+# LocMem cache: zero DB queries, sub-millisecond, perfect for Render free tier.
+# Each gunicorn worker has its own cache — fine for rate limiting since limits
+# are per-worker anyway on the free single-instance plan.
 CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {"max_connections": 50},
-            "SOCKET_CONNECT_TIMEOUT": 5,
-            "SOCKET_TIMEOUT": 5,
-            "RETRY_ON_TIMEOUT": True,
-        },
-        "KEY_PREFIX": "knhs",
-        "TIMEOUT": 300,  # 5 minutes default
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'knhs-cache',
     }
 }
 
@@ -251,11 +245,16 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
         "user": "1000/day",
         "sensitive": "5/minute",
+        "burst": "60/minute",
+        "sustained": "1000/hour",
+        "unlock": "5/hour",
+        "lock": "10/hour",
     },
     "EXCEPTION_HANDLER": "apps.system.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
