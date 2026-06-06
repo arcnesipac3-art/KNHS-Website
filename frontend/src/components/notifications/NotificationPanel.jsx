@@ -1,30 +1,40 @@
-import { useEffect, useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { notificationApi } from '../../lib/learningApi'
+import { queryKeys, staleTime } from '../../lib/queryClient'
 
 export default function NotificationPanel() {
-  const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
   const panelRef = useRef(null)
+  const queryClient = useQueryClient()
 
-  // Load unread count on mount
-  useEffect(() => {
-    loadUnreadCount()
-    // Disabled polling to prevent 429 rate limiting errors
-    // Uncomment below to re-enable polling if needed
-    // const interval = setInterval(loadUnreadCount, 30000)
-    // return () => clearInterval(interval)
-  }, [])
+  // Unread count — cached by TanStack Query, deduped across re-renders
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: queryKeys.notifications.unread(),
+    queryFn: async () => {
+      const { data } = await notificationApi.getUnreadCount()
+      return data.count || 0
+    },
+    staleTime: staleTime.notifications,
+    // Gentle background polling every 60s (only when tab is focused)
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: false,
+  })
 
-  // Load notifications when panel opens
-  useEffect(() => {
-    if (isOpen) {
-      loadNotifications()
-    }
-  }, [isOpen])
+  // Notifications list — only fetched when panel is open
+  const { data: notifications = [], isLoading: loading } = useQuery({
+    queryKey: ['notifications', 'panel-list'],
+    queryFn: async () => {
+      const { data } = await notificationApi.getAll()
+      const list = Array.isArray(data) ? data : (data?.results ?? [])
+      return list.slice(0, 10) // Show last 10
+    },
+    enabled: isOpen, // Only fetch when panel is open
+    staleTime: staleTime.notifications,
+  })
 
+  // Close panel when clicking outside
   // Close panel when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -33,40 +43,20 @@ export default function NotificationPanel() {
       }
     }
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
-
-  async function loadUnreadCount() {
-    try {
-      const { data } = await notificationApi.getUnreadCount()
-      setUnreadCount(data.count || 0)
-    } catch (err) {
-      console.error('Failed to load unread count:', err)
-    }
-  }
-
-  async function loadNotifications() {
-    setLoading(true)
-    try {
-      const { data } = await notificationApi.getAll()
-      setNotifications(data.slice(0, 10)) // Show last 10
-    } catch (err) {
-      console.error('Failed to load notifications:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   async function handleMarkAsRead(notificationId) {
     try {
       await notificationApi.markRead(notificationId)
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+      // Optimistically update the cache
+      queryClient.setQueryData(['notifications', 'panel-list'], (old) =>
+        (old || []).map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
       )
-      setUnreadCount((prev) => Math.max(0, prev - 1))
+      queryClient.setQueryData(queryKeys.notifications.unread(), (old) =>
+        Math.max(0, (old || 0) - 1)
+      )
     } catch (err) {
       console.error('Failed to mark as read:', err)
     }
@@ -75,8 +65,10 @@ export default function NotificationPanel() {
   async function handleMarkAllRead() {
     try {
       await notificationApi.markAllRead()
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-      setUnreadCount(0)
+      queryClient.setQueryData(['notifications', 'panel-list'], (old) =>
+        (old || []).map((n) => ({ ...n, is_read: true }))
+      )
+      queryClient.setQueryData(queryKeys.notifications.unread(), 0)
     } catch (err) {
       console.error('Failed to mark all as read:', err)
     }

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import api, { clearAccessToken, setAccessToken } from '../../lib/api'
 import { logAuthState } from '../../utils/devtools'
 
@@ -7,11 +7,15 @@ export const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [isBootstrapped, setIsBootstrapped] = useState(false)
+  // Use a ref instead of state to avoid re-render loops.
+  // Changing a ref does NOT trigger a re-render, so `bootstrap` keeps
+  // the same function reference across the component's lifetime.
+  const bootstrappedRef = useRef(false)
 
   const bootstrap = useCallback(async () => {
     // Prevent multiple simultaneous bootstrap calls
-    if (isBootstrapped) return
+    if (bootstrappedRef.current) return
+    bootstrappedRef.current = true
     
     logAuthState('bootstrap:start', { timestamp: new Date().toISOString() })
     try {
@@ -21,16 +25,17 @@ export function AuthProvider({ children }) {
       const me = await api.get('/auth/me/')
       logAuthState('bootstrap:user-loaded', { user: me.data })
       setUser(me.data)
-      setIsBootstrapped(true)
     } catch (error) {
       logAuthState('bootstrap:failed', { error: error.message, status: error.response?.status })
       clearAccessToken()
       setUser(null)
+      // Allow retry on next explicit call (e.g. refreshUser after re-login)
+      bootstrappedRef.current = false
     } finally {
       setLoading(false)
       logAuthState('bootstrap:complete', {})
     }
-  }, [isBootstrapped])
+  }, []) // No dependencies — stable reference forever
 
   useEffect(() => {
     bootstrap()
@@ -42,6 +47,7 @@ export function AuthProvider({ children }) {
     logAuthState('login:success', { user: data.user, access_token: data.access_token?.substring(0, 20) + '...' })
     setAccessToken(data.access_token)
     setUser(data.user)
+    bootstrappedRef.current = true
     return data.user
   }
 
@@ -56,6 +62,7 @@ export function AuthProvider({ children }) {
     } finally {
       clearAccessToken()
       setUser(null)
+      bootstrappedRef.current = false
       logAuthState('logout:complete', {})
     }
   }
@@ -79,7 +86,9 @@ export function AuthProvider({ children }) {
       refreshUser: bootstrap,
       isAuthenticated: Boolean(user),
     }),
-    [user, loading, bootstrap, updateUser],
+    // bootstrap and updateUser are stable refs (empty deps), so only
+    // user/loading changes will produce a new context value.
+    [user, loading, updateUser, bootstrap],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

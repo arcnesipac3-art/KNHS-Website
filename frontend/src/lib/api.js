@@ -76,6 +76,8 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
+
+    // --- Handle 401 Unauthorized (token refresh) ---
     if (
       error.response?.status === 401 &&
       original &&
@@ -99,8 +101,29 @@ api.interceptors.response.use(
         window.dispatchEvent(new CustomEvent('auth:session-expired'))
       }
     }
+
+    // --- Handle 429 Too Many Requests (rate limit retry with backoff) ---
+    if (error.response?.status === 429 && original) {
+      const retryCount = original._retryCount || 0
+      const MAX_RETRIES = 3
+
+      if (retryCount < MAX_RETRIES) {
+        original._retryCount = retryCount + 1
+
+        // Respect Retry-After header if present (seconds), otherwise exponential backoff
+        const retryAfterHeader = error.response.headers?.['retry-after']
+        const delayMs = retryAfterHeader
+          ? parseInt(retryAfterHeader, 10) * 1000
+          : Math.min(1000 * 2 ** retryCount, 8000) // 1s, 2s, 4s (capped at 8s)
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+        return api(original)
+      }
+    }
+
     return Promise.reject(error)
   },
 )
 
 export default api
+
