@@ -132,7 +132,7 @@ export default function Messages() {
         }, 25000)
 
         if (selectedThreadRef.current?.id) {
-          const currentId = Number(selectedThreadRef.current.id)
+          const currentId = selectedThreadRef.current.id;
           socket.send(
             JSON.stringify({
               type: 'thread.subscribe',
@@ -157,8 +157,8 @@ export default function Messages() {
         }
 
         if (payload.type === 'message.created') {
-          const payloadThreadId = payload.thread_id ? Number(payload.thread_id) : null
-          const currentThreadId = selectedThreadRef.current?.id ? Number(selectedThreadRef.current.id) : null
+          const payloadThreadId = payload.thread_id
+          const currentThreadId = selectedThreadRef.current?.id
           
           if (payloadThreadId && payloadThreadId === currentThreadId) {
             const nextMessages = reconcileMessage(
@@ -249,8 +249,8 @@ export default function Messages() {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN) return
 
-    const selectedId = selectedThread?.id ? Number(selectedThread.id) : null
-    const subscribedId = subscribedThreadRef.current ? Number(subscribedThreadRef.current) : null
+    const selectedId = selectedThread?.id
+    const subscribedId = subscribedThreadRef.current
 
     if (subscribedId && subscribedId !== selectedId) {
       socket.send(
@@ -274,29 +274,27 @@ export default function Messages() {
 
   const applyThreadUpdate = useCallback((thread) => {
     setThreads((prev) => sortThreads(upsertThread(prev, thread)))
-    setSelectedThread((prev) => (Number(prev?.id) === Number(thread.id) ? thread : prev))
+    setSelectedThread((prev) => (prev?.id === thread.id ? thread : prev))
   }, [])
 
   const updateCachedMessages = useCallback((threadId, nextMessages) => {
-    const normId = Number(threadId)
-    if (isNaN(normId)) return
-    messageCacheRef.current.set(normId, nextMessages)
-    if (selectedThreadRef.current?.id && Number(selectedThreadRef.current.id) === normId) {
+    if (!threadId) return
+    messageCacheRef.current.set(threadId, nextMessages)
+    if (selectedThreadRef.current?.id === threadId) {
       setMessages(nextMessages)
     }
   }, [])
 
   const promoteThreadLocally = useCallback((threadId, message) => {
-    const normId = Number(threadId)
-    if (isNaN(normId)) return
+    if (!threadId) return
     const previewThread = {
       ...selectedThreadRef.current,
-      id: normId,
+      id: threadId,
       updated_at: message.created_at,
       unread_count: 0,
       last_message: {
         id: message.id,
-        thread: normId,
+        thread: threadId,
         sender: message.sender,
         sender_name: message.sender_name,
         sender_email: message.sender_email,
@@ -355,9 +353,8 @@ export default function Messages() {
   }
 
   async function loadMessages(threadId) {
-    const normId = Number(threadId)
-    if (isNaN(normId)) return
-    const cachedMessages = messageCacheRef.current.get(normId)
+    if (!threadId) return
+    const cachedMessages = messageCacheRef.current.get(threadId)
     if (cachedMessages) {
       setMessages(cachedMessages)
       setMessagesLoading(false)
@@ -368,10 +365,10 @@ export default function Messages() {
     activeMessagesRequestRef.current = requestId
     setMessagesLoading(true)
     try {
-      const response = await api.get(`/messages/?thread=${normId}`)
+      const response = await api.get(`/messages/?thread=${threadId}`)
       if (requestId !== activeMessagesRequestRef.current) return
       const nextMessages = dedupeMessages(response.data.results || response.data)
-      messageCacheRef.current.set(normId, nextMessages)
+      messageCacheRef.current.set(threadId, nextMessages)
       setMessages(nextMessages)
     } catch (error) {
       console.error('Failed to load messages:', error)
@@ -386,15 +383,15 @@ export default function Messages() {
   }
 
   async function markThreadRead(threadId, options = {}) {
-    const normId = Number(threadId)
-    if (isNaN(normId)) return
-    try {
-      await api.post(`/message-threads/${normId}/mark_read/`)
-      setThreads((prev) =>
-        prev.map((thread) => (Number(thread.id) === normId ? { ...thread, unread_count: 0 } : thread))
-      )
-      setSelectedThread((prev) => (Number(prev?.id) === normId ? { ...prev, unread_count: 0 } : prev))
-    } catch (error) {
+    const normId = threadId;
+      if (!normId) return;
+      try {
+        await api.post(`/message-threads/${normId}/mark_read/`)
+        setThreads((prev) =>
+          prev.map((thread) => (thread.id === normId ? { ...thread, unread_count: 0 } : thread))
+        )
+        setSelectedThread((prev) => (prev?.id === normId ? { ...prev, unread_count: 0 } : prev))
+      } catch (error) {
       if (!options.silent) {
         console.error('Failed to mark thread as read:', error)
       }
@@ -413,8 +410,8 @@ export default function Messages() {
       alert('Please select a conversation before sending a message');
       return;
     }
-    const threadId = Number(selectedThread.id);
-    if (isNaN(threadId)) {
+    const threadId = selectedThread.id;
+      if (!threadId) {
       alert('Invalid thread ID');
       return;
     }
@@ -484,17 +481,13 @@ export default function Messages() {
     }
   }
 
-  async function handleDeleteConversation(threadId) {
-    if (!window.confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
-      return
-    }
-    const normId = Number(threadId)
-    if (isNaN(normId)) return
+    // Delete conversation using raw thread ID (string)
+    const threadId = threadId; // keep as is
     try {
-      await api.delete(`/message-threads/${normId}/delete_conversation/`)
-      messageCacheRef.current.delete(normId)
-      setThreads(prev => prev.filter(t => Number(t.id) !== normId))
-      if (selectedThread?.id && Number(selectedThread.id) === normId) {
+      await api.delete(`/message-threads/${threadId}/delete_conversation/`)
+      messageCacheRef.current.delete(threadId)
+      setThreads(prev => prev.filter(t => t.id !== threadId))
+      if (selectedThread?.id && selectedThread.id === threadId) {
         setSelectedThread(null)
         setMessages([])
       }
@@ -502,7 +495,6 @@ export default function Messages() {
       console.error('Failed to delete conversation:', error)
       alert('Failed to delete conversation. Please try again.')
     }
-  }
 
   async function handleStartConversation(e) {
     e.preventDefault()
