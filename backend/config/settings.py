@@ -24,6 +24,7 @@ if os.getenv("RENDER"):
     ALLOWED_HOSTS.append(".onrender.com")
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -34,6 +35,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
+    "channels",
     "debug_toolbar",
     "django_redis",
     "apps.accounts",
@@ -66,6 +68,7 @@ if DEBUG:
     MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
 ROOT_URLCONF = "config.urls"
+ASGI_APPLICATION = "config.asgi.application"
 
 TEMPLATES = [
     {
@@ -149,6 +152,9 @@ AUTHENTICATION_BACKENDS = [
 
 # Redis Configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CHANNEL_REDIS_URL = os.getenv("CHANNEL_REDIS_URL") or (
+    os.getenv("REDIS_URL") if os.getenv("REDIS_URL") and os.getenv("RENDER") else None
+)
 
 # Cache Configuration
 CACHES = {
@@ -218,6 +224,22 @@ CACHES = {
         'LOCATION': 'knhs-cache',
     }
 }
+
+if CHANNEL_REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [CHANNEL_REDIS_URL],
+            },
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
