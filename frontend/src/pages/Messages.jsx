@@ -64,11 +64,14 @@ export default function Messages() {
     selectedThreadRef.current = selectedThread
   }, [selectedThread])
 
-  // Polling fallback: silently refresh messages every 10s in case a WebSocket event was missed
+  // Polling fallback: only poll when WebSocket is disconnected, every 2s
   useEffect(() => {
     if (!selectedThread?.id) return
     const threadId = selectedThread.id
     const intervalId = setInterval(async () => {
+      // Skip polling if WebSocket is connected - rely on real-time updates
+      if (socketRef.current?.readyState === WebSocket.OPEN) return
+      
       try {
         const response = await api.get(`/messages/?thread=${threadId}`)
         const fresh = dedupeMessages(response.data.results || response.data)
@@ -83,7 +86,7 @@ export default function Messages() {
       } catch {
         // Silently ignore polling errors
       }
-    }, 10000)
+    }, 2000)
     return () => clearInterval(intervalId)
   }, [selectedThread?.id])
 
@@ -152,7 +155,7 @@ export default function Messages() {
           if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ type: 'ping' }))
           }
-        }, 25000)
+        }, 15000)
 
         if (selectedThreadRef.current?.id) {
           const currentId = selectedThreadRef.current.id;
@@ -248,7 +251,7 @@ export default function Messages() {
           }
 
           reconnectAttempts += 1
-          const backoff = Math.min(2000 * Math.pow(1.5, reconnectAttempts - 1), 30000)
+          const backoff = Math.min(1000 * Math.pow(1.2, reconnectAttempts - 1), 5000)
           reconnectTimeoutRef.current = window.setTimeout(connect, backoff)
         }
       }
