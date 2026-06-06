@@ -661,6 +661,63 @@ class FriendshipViewSet(viewsets.ModelViewSet):
         
         return Response(friends)
 
+    @action(detail=False, methods=["post"])
+    def send_request(self, request):
+        """Send a friend request to another user."""
+        recipient_id = request.data.get("recipient_id")
+        
+        if not recipient_id:
+            return Response(
+                {"error": "recipient_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        from apps.accounts.models import User
+        try:
+            recipient = User.objects.get(id=recipient_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if recipient == request.user:
+            return Response(
+                {"error": "Cannot send friend request to yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if friendship already exists
+        existing = Friendship.objects.filter(
+            Q(requester=request.user, recipient=recipient) |
+            Q(requester=recipient, recipient=request.user)
+        ).first()
+        
+        if existing:
+            if existing.status == "pending":
+                return Response(
+                    {"error": "Friend request already pending"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif existing.status == "accepted":
+                return Response(
+                    {"error": "Already friends"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                # Rejected or blocked - allow new request
+                existing.delete()
+        
+        # Create friend request
+        friendship = Friendship.objects.create(
+            requester=request.user,
+            recipient=recipient,
+            status="pending"
+        )
+        
+        serializer = FriendshipSerializer(friendship, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=["get"])
     def pending_requests(self, request):
         """Get pending friend requests for current user."""
