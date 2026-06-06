@@ -36,8 +36,31 @@ export default function Messages() {
     scrollToBottom()
   }, [messages])
 
+  useEffect(() => {
+    if (showNewConversation && searchUsers.length >= 2) {
+      loadAvailableUsers()
+    }
+  }, [showNewConversation, searchUsers])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  async function loadAvailableUsers() {
+    setLoadingUsers(true)
+    try {
+      const response = await api.get('/users/', { params: { search: searchUsers } })
+      const users = Array.isArray(response.data) ? response.data : (response.data?.results ?? [])
+      // Filter out current user and already selected participants
+      const filtered = users.filter(u => 
+        u.id !== user?.id && !selectedParticipants.find(p => p.id === u.id)
+      )
+      setAvailableUsers(filtered)
+    } catch (error) {
+      console.error('Failed to load users:', error)
+    } finally {
+      setLoadingUsers(false)
+    }
   }
 
   async function loadThreads() {
@@ -88,24 +111,43 @@ export default function Messages() {
 
   async function handleStartConversation(e) {
     e.preventDefault()
-    const formData = new FormData(e.target)
-    const participantIds = formData.get('participant_ids').split(',').map(id => id.trim())
-    const subject = formData.get('subject')
-    const initialMessage = formData.get('initial_message')
+    if (selectedParticipants.length === 0) {
+      alert('Please select at least one participant')
+      return
+    }
+    if (!initialMessage.trim()) {
+      alert('Please enter a message')
+      return
+    }
 
     try {
       const response = await api.post('/message-threads/start_conversation/', {
-        participant_ids: participantIds,
-        subject,
-        initial_message,
+        participant_ids: selectedParticipants.map(p => p.id),
+        subject: subject || undefined,
+        initial_message: initialMessage,
       })
       setShowNewConversation(false)
+      setSelectedParticipants([])
+      setSubject('')
+      setInitialMessage('')
+      setSearchUsers('')
+      setAvailableUsers([])
       loadThreads()
       setSelectedThread(response.data)
     } catch (error) {
       console.error('Failed to start conversation:', error)
-      alert('Failed to start conversation. Please check participant IDs.')
+      alert('Failed to start conversation. Please try again.')
     }
+  }
+
+  function handleAddParticipant(user) {
+    setSelectedParticipants([...selectedParticipants, user])
+    setAvailableUsers(availableUsers.filter(u => u.id !== user.id))
+    setSearchUsers('')
+  }
+
+  function handleRemoveParticipant(userId) {
+    setSelectedParticipants(selectedParticipants.filter(p => p.id !== userId))
   }
 
   function getAvatar(name) {
@@ -161,9 +203,16 @@ export default function Messages() {
         {showNewConversation && (
           <Card className="mb-4">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-text">Start New Conversation</h2>
+              <h2 className="text-lg font-semibold text-text">New Message</h2>
               <button
-                onClick={() => setShowNewConversation(false)}
+                onClick={() => {
+                  setShowNewConversation(false)
+                  setSelectedParticipants([])
+                  setSubject('')
+                  setInitialMessage('')
+                  setSearchUsers('')
+                  setAvailableUsers([])
+                }}
                 className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -172,23 +221,76 @@ export default function Messages() {
               </button>
             </div>
             <form onSubmit={handleStartConversation} className="space-y-4">
+              {/* Participant Selection */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-text">
-                  Participant IDs (comma-separated)
+                  To: {selectedParticipants.length > 0 && `${selectedParticipants.length} selected`}
                 </label>
-                <input
-                  type="text"
-                  name="participant_ids"
-                  required
-                  placeholder="e.g., uuid1, uuid2"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
-                />
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {selectedParticipants.map(participant => (
+                    <div
+                      key={participant.id}
+                      className="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1 text-sm"
+                    >
+                      <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColor(participant.display_name || participant.email)}`}>
+                        {getAvatar(participant.display_name || participant.email)}
+                      </div>
+                      <span className="text-text">{participant.display_name || participant.email}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveParticipant(participant.id)}
+                        className="text-gray-500 hover:text-red-600"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchUsers}
+                    onChange={e => setSearchUsers(e.target.value)}
+                    placeholder="Search for people..."
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
+                  />
+                  <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                {loadingUsers && (
+                  <div className="mt-2 flex items-center justify-center py-2">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-knhs-purple border-t-transparent"></div>
+                  </div>
+                )}
+                {searchUsers.length >= 2 && availableUsers.length > 0 && (
+                  <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white">
+                    {availableUsers.map(user => (
+                      <div
+                        key={user.id}
+                        onClick={() => handleAddParticipant(user)}
+                        className="flex cursor-pointer items-center gap-3 p-3 hover:bg-gray-50"
+                      >
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white ${getAvatarColor(user.display_name || user.email)}`}>
+                          {getAvatar(user.display_name || user.email)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-text">{user.display_name || user.email}</p>
+                          <p className="text-xs text-muted">{user.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-text">Subject (optional)</label>
                 <input
                   type="text"
-                  name="subject"
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
                   placeholder="Conversation subject"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
                 />
@@ -196,7 +298,8 @@ export default function Messages() {
               <div>
                 <label className="mb-2 block text-sm font-medium text-text">Message</label>
                 <textarea
-                  name="initial_message"
+                  value={initialMessage}
+                  onChange={e => setInitialMessage(e.target.value)}
                   required
                   rows={4}
                   placeholder="Type your message..."
@@ -204,10 +307,23 @@ export default function Messages() {
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={() => setShowNewConversation(false)}>
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  onClick={() => {
+                    setShowNewConversation(false)
+                    setSelectedParticipants([])
+                    setSubject('')
+                    setInitialMessage('')
+                    setSearchUsers('')
+                    setAvailableUsers([])
+                  }}
+                >
                   Cancel
                 </Button>
-                <Button type="submit">Start Conversation</Button>
+                <Button type="submit" disabled={selectedParticipants.length === 0 || !initialMessage.trim()}>
+                  Send Message
+                </Button>
               </div>
             </form>
           </Card>
