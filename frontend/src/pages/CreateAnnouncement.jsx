@@ -24,11 +24,132 @@ export default function CreateAnnouncement() {
   const [classrooms, setClassrooms] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [touched, setTouched] = useState({})
 
   const isTeacher = user?.role === 'teacher'
   const isAdmin = user?.role === 'admin'
   const isPrincipal = user?.role === 'principal'
   const canCreateSchoolWide = isAdmin || isPrincipal
+
+  const validateField = (name, value) => {
+    const errors = {}
+    
+    switch (name) {
+      case 'title':
+        if (!value.trim()) errors.title = 'Title is required'
+        else if (value.trim().length < 3) errors.title = 'Title must be at least 3 characters'
+        else if (value.trim().length > 200) errors.title = 'Title must be less than 200 characters'
+        break
+      case 'body':
+        if (!value.trim()) errors.body = 'Message is required'
+        else if (value.trim().length < 10) errors.body = 'Message must be at least 10 characters'
+        else if (value.trim().length > 5000) errors.body = 'Message must be less than 5000 characters'
+        break
+      case 'audienceRefId':
+        if (audienceType !== 'school' && !value) errors.audienceRefId = 'Please select an audience'
+        break
+      case 'scheduledTime':
+        if (!publishNow && !value) errors.scheduledTime = 'Please select a scheduled publish time'
+        else if (!publishNow && value) {
+          const scheduledDate = new Date(value)
+          const now = new Date()
+          if (scheduledDate <= now) errors.scheduledTime = 'Scheduled time must be in the future'
+        }
+        break
+      default:
+        break
+    }
+    
+    return errors
+  }
+
+  const handleChange = (name, value) => {
+    switch (name) {
+      case 'title':
+        setTitle(value)
+        break
+      case 'body':
+        setBody(value)
+        break
+      case 'priority':
+        setPriority(value)
+        break
+      case 'audienceType':
+        setAudienceType(value)
+        setAudienceRefId('')
+        break
+      case 'audienceRefId':
+        setAudienceRefId(value)
+        break
+      case 'publishNow':
+        setPublishNow(value)
+        break
+      case 'scheduledTime':
+        setScheduledTime(value)
+        break
+      default:
+        break
+    }
+    
+    // Validate field on change if it has been touched
+    if (touched[name]) {
+      const errors = validateField(name, value)
+      setFieldErrors(prev => ({ ...prev, ...errors }))
+    }
+  }
+
+  const handleBlur = (name, value) => {
+    setTouched(prev => ({ ...prev, [name]: true }))
+    
+    const errors = validateField(name, value)
+    setFieldErrors(prev => ({ ...prev, ...errors }))
+  }
+
+  const validateForm = () => {
+    const allErrors = {}
+    const fieldsToValidate = ['title', 'body']
+    
+    if (audienceType !== 'school') {
+      fieldsToValidate.push('audienceRefId')
+    }
+    
+    if (!publishNow) {
+      fieldsToValidate.push('scheduledTime')
+    }
+    
+    fieldsToValidate.forEach(field => {
+      let value
+      switch (field) {
+        case 'title': value = title; break
+        case 'body': value = body; break
+        case 'audienceRefId': value = audienceRefId; break
+        case 'scheduledTime': value = scheduledTime; break
+        default: value = ''
+      }
+      const errors = validateField(field, value)
+      Object.assign(allErrors, errors)
+    })
+    
+    return allErrors
+  }
+
+  // Calculate form progress
+  const requiredFields = ['title', 'body']
+  if (audienceType !== 'school') requiredFields.push('audienceRefId')
+  if (!publishNow) requiredFields.push('scheduledTime')
+  const filledRequiredFields = requiredFields.filter(field => {
+    let value
+    switch (field) {
+      case 'title': value = title; break
+      case 'body': value = body; break
+      case 'audienceRefId': value = audienceRefId; break
+      case 'scheduledTime': value = scheduledTime; break
+      default: value = ''
+    }
+    return value?.trim()
+  }).length
+  const progress = Math.round((filledRequiredFields / requiredFields.length) * 100)
 
   // Access control
   useEffect(() => {
@@ -62,21 +183,12 @@ export default function CreateAnnouncement() {
   async function handleSubmit(e) {
     e.preventDefault()
     
-    // Validation
-    if (!title.trim()) {
-      setError('Title is required')
-      return
-    }
-    if (!body.trim()) {
-      setError('Body is required')
-      return
-    }
-    if (audienceType !== 'school' && !audienceRefId) {
-      setError('Please select an audience')
-      return
-    }
-    if (!publishNow && !scheduledTime) {
-      setError('Please select a scheduled publish time')
+    // Validate all fields
+    const errors = validateForm()
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setTouched({ title: true, body: true, audienceRefId: true, scheduledTime: true })
+      setError('Please fix the errors before creating the announcement')
       return
     }
 
@@ -106,6 +218,7 @@ export default function CreateAnnouncement() {
     } catch (err) {
       console.error('Failed to create announcement:', err)
       setError(err.response?.data?.error || 'Failed to create announcement. Please try again.')
+    } finally {
       setSaving(false)
     }
   }
@@ -123,6 +236,20 @@ export default function CreateAnnouncement() {
             Cancel
           </Button>
         </div>
+
+        {/* Form Progress */}
+        <Card>
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium text-text">Form Progress</span>
+            <span className="text-muted">{progress}% Complete</span>
+          </div>
+          <div className="h-2 rounded-full bg-gray-200">
+            <div 
+              className="h-2 rounded-full bg-knhs-purple transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </Card>
 
         {/* Error Message */}
         {error && (
@@ -160,13 +287,23 @@ export default function CreateAnnouncement() {
                   type="text"
                   id="title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => handleChange('title', e.target.value)}
+                  onBlur={(e) => handleBlur('title', e.target.value)}
                   placeholder="Enter announcement title"
                   maxLength={200}
-                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                  className={`mt-2 block w-full rounded-lg border px-4 py-2 text-text focus:outline-none focus:ring-2 ${
+                    fieldErrors.title && touched.title
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-gray-300 focus:border-knhs-purple focus:ring-knhs-purple/20'
+                  }`}
                   required
+                  aria-invalid={fieldErrors.title && touched.title}
+                  aria-describedby={fieldErrors.title ? 'title-error' : 'title-hint'}
                 />
-                <p className="mt-1 text-xs text-muted">{title.length}/200 characters</p>
+                {fieldErrors.title && touched.title && (
+                  <p id="title-error" className="mt-1 text-xs text-red-600">{fieldErrors.title}</p>
+                )}
+                <p id="title-hint" className="mt-1 text-xs text-muted">{title.length}/200 characters</p>
               </div>
 
               {/* Priority */}
@@ -177,8 +314,9 @@ export default function CreateAnnouncement() {
                 <select
                   id="priority"
                   value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                  onChange={(e) => handleChange('priority', e.target.value)}
+                  onBlur={(e) => handleBlur('priority', e.target.value)}
+                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
                 >
                   <option value="normal">ℹ️ Normal</option>
                   <option value="important">⚠️ Important</option>
@@ -197,14 +335,24 @@ export default function CreateAnnouncement() {
                 <textarea
                   id="body"
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
+                  onChange={(e) => handleChange('body', e.target.value)}
+                  onBlur={(e) => handleBlur('body', e.target.value)}
                   placeholder="Write your announcement message here..."
                   rows={8}
                   maxLength={5000}
-                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                  className={`mt-2 block w-full rounded-lg border px-4 py-2 text-text focus:outline-none focus:ring-2 ${
+                    fieldErrors.body && touched.body
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-gray-300 focus:border-knhs-purple focus:ring-knhs-purple/20'
+                  }`}
                   required
+                  aria-invalid={fieldErrors.body && touched.body}
+                  aria-describedby={fieldErrors.body ? 'body-error' : 'body-hint'}
                 />
-                <p className="mt-1 text-xs text-muted">{body.length}/5000 characters</p>
+                {fieldErrors.body && touched.body && (
+                  <p id="body-error" className="mt-1 text-xs text-red-600">{fieldErrors.body}</p>
+                )}
+                <p id="body-hint" className="mt-1 text-xs text-muted">{body.length}/5000 characters</p>
               </div>
             </div>
           </Card>
@@ -220,11 +368,9 @@ export default function CreateAnnouncement() {
                 <select
                   id="audienceType"
                   value={audienceType}
-                  onChange={(e) => {
-                    setAudienceType(e.target.value)
-                    setAudienceRefId('')
-                  }}
-                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                  onChange={(e) => handleChange('audienceType', e.target.value)}
+                  onBlur={(e) => handleBlur('audienceType', e.target.value)}
+                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple/20"
                   disabled={isTeacher && !canCreateSchoolWide}
                 >
                   <option value="school" disabled={isTeacher && !canCreateSchoolWide}>
@@ -251,9 +397,16 @@ export default function CreateAnnouncement() {
                   <select
                     id="classroom"
                     value={audienceRefId}
-                    onChange={(e) => setAudienceRefId(e.target.value)}
-                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                    onChange={(e) => handleChange('audienceRefId', e.target.value)}
+                    onBlur={(e) => handleBlur('audienceRefId', e.target.value)}
+                    className={`mt-2 block w-full rounded-lg border px-4 py-2 text-text focus:outline-none focus:ring-2 ${
+                      fieldErrors.audienceRefId && touched.audienceRefId
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-knhs-purple focus:ring-knhs-purple/20'
+                    }`}
                     required
+                    aria-invalid={fieldErrors.audienceRefId && touched.audienceRefId}
+                    aria-describedby={fieldErrors.audienceRefId ? 'audienceRefId-error' : undefined}
                   >
                     <option value="">Choose a class...</option>
                     {classrooms.map((classroom) => (
@@ -262,6 +415,9 @@ export default function CreateAnnouncement() {
                       </option>
                     ))}
                   </select>
+                  {fieldErrors.audienceRefId && touched.audienceRefId && (
+                    <p id="audienceRefId-error" className="mt-1 text-xs text-red-600">{fieldErrors.audienceRefId}</p>
+                  )}
                 </div>
               )}
 
@@ -273,9 +429,16 @@ export default function CreateAnnouncement() {
                   <select
                     id="gradeLevel"
                     value={audienceRefId}
-                    onChange={(e) => setAudienceRefId(e.target.value)}
-                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                    onChange={(e) => handleChange('audienceRefId', e.target.value)}
+                    onBlur={(e) => handleBlur('audienceRefId', e.target.value)}
+                    className={`mt-2 block w-full rounded-lg border px-4 py-2 text-text focus:outline-none focus:ring-2 ${
+                      fieldErrors.audienceRefId && touched.audienceRefId
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-knhs-purple focus:ring-knhs-purple/20'
+                    }`}
                     required
+                    aria-invalid={fieldErrors.audienceRefId && touched.audienceRefId}
+                    aria-describedby={fieldErrors.audienceRefId ? 'audienceRefId-error' : undefined}
                   >
                     <option value="">Choose a grade...</option>
                     <option value="7">Grade 7</option>
@@ -285,6 +448,9 @@ export default function CreateAnnouncement() {
                     <option value="11">Grade 11</option>
                     <option value="12">Grade 12</option>
                   </select>
+                  {fieldErrors.audienceRefId && touched.audienceRefId && (
+                    <p id="audienceRefId-error" className="mt-1 text-xs text-red-600">{fieldErrors.audienceRefId}</p>
+                  )}
                 </div>
               )}
 
@@ -296,9 +462,16 @@ export default function CreateAnnouncement() {
                   <select
                     id="strand"
                     value={audienceRefId}
-                    onChange={(e) => setAudienceRefId(e.target.value)}
-                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                    onChange={(e) => handleChange('audienceRefId', e.target.value)}
+                    onBlur={(e) => handleBlur('audienceRefId', e.target.value)}
+                    className={`mt-2 block w-full rounded-lg border px-4 py-2 text-text focus:outline-none focus:ring-2 ${
+                      fieldErrors.audienceRefId && touched.audienceRefId
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-knhs-purple focus:ring-knhs-purple/20'
+                    }`}
                     required
+                    aria-invalid={fieldErrors.audienceRefId && touched.audienceRefId}
+                    aria-describedby={fieldErrors.audienceRefId ? 'audienceRefId-error' : undefined}
                   >
                     <option value="">Choose a strand...</option>
                     <option value="STEM">STEM - Science, Technology, Engineering, and Mathematics</option>
@@ -307,6 +480,9 @@ export default function CreateAnnouncement() {
                     <option value="GAS">GAS - General Academic Strand</option>
                     <option value="TVL">TVL - Technical-Vocational-Livelihood</option>
                   </select>
+                  {fieldErrors.audienceRefId && touched.audienceRefId && (
+                    <p id="audienceRefId-error" className="mt-1 text-xs text-red-600">{fieldErrors.audienceRefId}</p>
+                  )}
                 </div>
               )}
 
@@ -318,9 +494,16 @@ export default function CreateAnnouncement() {
                   <select
                     id="role"
                     value={audienceRefId}
-                    onChange={(e) => setAudienceRefId(e.target.value)}
-                    className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                    onChange={(e) => handleChange('audienceRefId', e.target.value)}
+                    onBlur={(e) => handleBlur('audienceRefId', e.target.value)}
+                    className={`mt-2 block w-full rounded-lg border px-4 py-2 text-text focus:outline-none focus:ring-2 ${
+                      fieldErrors.audienceRefId && touched.audienceRefId
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-knhs-purple focus:ring-knhs-purple/20'
+                    }`}
                     required
+                    aria-invalid={fieldErrors.audienceRefId && touched.audienceRefId}
+                    aria-describedby={fieldErrors.audienceRefId ? 'audienceRefId-error' : undefined}
                   >
                     <option value="">Choose a role...</option>
                     <option value="student">Students</option>
@@ -330,6 +513,9 @@ export default function CreateAnnouncement() {
                     <option value="guidance">Guidance Office</option>
                     <option value="registrar">Registrar</option>
                   </select>
+                  {fieldErrors.audienceRefId && touched.audienceRefId && (
+                    <p id="audienceRefId-error" className="mt-1 text-xs text-red-600">{fieldErrors.audienceRefId}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -344,7 +530,7 @@ export default function CreateAnnouncement() {
                   type="radio"
                   id="publishNow"
                   checked={publishNow}
-                  onChange={() => setPublishNow(true)}
+                  onChange={() => handleChange('publishNow', true)}
                   className="mt-1 h-4 w-4 text-knhs-purple focus:ring-knhs-purple"
                 />
                 <div>
@@ -361,7 +547,7 @@ export default function CreateAnnouncement() {
                   type="radio"
                   id="scheduleLater"
                   checked={!publishNow}
-                  onChange={() => setPublishNow(false)}
+                  onChange={() => handleChange('publishNow', false)}
                   className="mt-1 h-4 w-4 text-knhs-purple focus:ring-knhs-purple"
                 />
                 <div className="flex-1">
@@ -373,11 +559,21 @@ export default function CreateAnnouncement() {
                     <input
                       type="datetime-local"
                       value={scheduledTime}
-                      onChange={(e) => setScheduledTime(e.target.value)}
+                      onChange={(e) => handleChange('scheduledTime', e.target.value)}
+                      onBlur={(e) => handleBlur('scheduledTime', e.target.value)}
                       min={new Date().toISOString().slice(0, 16)}
-                      className="block w-full rounded-lg border border-gray-300 px-4 py-2 text-text focus:border-knhs-purple focus:outline-none focus:ring-2 focus:ring-knhs-purple focus:ring-opacity-20"
+                      className={`block w-full rounded-lg border px-4 py-2 text-text focus:outline-none focus:ring-2 ${
+                        fieldErrors.scheduledTime && touched.scheduledTime
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-knhs-purple focus:ring-knhs-purple/20'
+                      }`}
                       required={!publishNow}
+                      aria-invalid={fieldErrors.scheduledTime && touched.scheduledTime}
+                      aria-describedby={fieldErrors.scheduledTime ? 'scheduledTime-error' : undefined}
                     />
+                  )}
+                  {fieldErrors.scheduledTime && touched.scheduledTime && (
+                    <p id="scheduledTime-error" className="mt-1 text-xs text-red-600">{fieldErrors.scheduledTime}</p>
                   )}
                 </div>
               </div>
