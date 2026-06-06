@@ -138,7 +138,7 @@ export default function RegistrarDashboard() {
               ) : (
                 <div className="divide-y divide-gray-100">
                   {recentApplications.slice(0, 8).map(app => (
-                    <div key={app.id} className="flex items-center justify-between py-3">
+                    <div key={app.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3">
                       <div>
                         <p className="font-medium text-text">
                           {app.first_name} {app.last_name}
@@ -168,7 +168,7 @@ export default function RegistrarDashboard() {
           </div>
 
           {/* Quick links */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:space-y-6">
             {/* Student Statistics */}
             <Card title="Student Statistics" subtitle="Current enrollment by grade">
               {!loading && studentStats.total > 0 ? (

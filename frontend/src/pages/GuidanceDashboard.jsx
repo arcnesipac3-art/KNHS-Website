@@ -194,7 +194,7 @@ export default function GuidanceDashboard() {
         </div>
 
         {/* KPI cards */}
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="border-l-4 border-l-blue-500">
             <p className="text-2xl font-bold text-text">{students.length}</p>
             <p className="text-sm text-muted">Total Students</p>
@@ -224,7 +224,7 @@ export default function GuidanceDashboard() {
                   {studentAlerts.slice(0, 5).map((alert) => (
                     <div
                       key={alert.id}
-                      className={`flex items-start justify-between rounded-lg border p-4 ${
+                      className={`flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 rounded-lg border p-4 ${
                         alert.alert_type === 'attendance' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'
                       }`}
                     >
@@ -273,7 +273,7 @@ export default function GuidanceDashboard() {
                 <p className="py-8 text-center text-muted">No counseling cases found.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[600px]">
                     <thead>
                       <tr className="border-b border-gray-200">
                         <th className="px-4 py-2 text-left text-sm font-medium text-text">Student</th>
@@ -325,7 +325,7 @@ export default function GuidanceDashboard() {
                             {new Date(case_.created_at).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-3 text-sm">
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                               <Button size="sm" variant="secondary" onClick={() => handleViewCaseNotes(case_.id)}>
                                 View
                               </Button>
@@ -351,7 +351,7 @@ export default function GuidanceDashboard() {
           </div>
 
           {/* Right Column (1/3) */}
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             {/* Recent Notes */}
             {recentNotes?.length > 0 && (
               <Card title="Recent Counseling Notes" subtitle="Latest case notes">
@@ -377,7 +377,7 @@ export default function GuidanceDashboard() {
 
             {/* Student lookup */}
             <Card title="Student Lookup" subtitle="Search and view student records">
-              <div className="mb-4 flex gap-3">
+              <div className="mb-4 flex flex-col sm:flex-row gap-3">
                 <input type="text" value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Search by name, email, or LRN..."

@@ -147,7 +147,7 @@ export default function ParentDashboard() {
             {/* Child Selection */}
             <Card className="mb-6">
               <h2 className="mb-4 text-lg font-semibold text-text">Select Child</h2>
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4">
                 {children.map(child => (
                   <button
                     key={child.id}
@@ -177,7 +177,7 @@ export default function ParentDashboard() {
                     <p className="text-muted">No grades available</p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full">
+                      <table className="w-full min-w-[600px]">
                         <thead>
                           <tr className="border-b border-gray-200">
                             <th className="px-4 py-2 text-left text-sm font-medium text-text">Subject</th>
@@ -212,7 +212,7 @@ export default function ParentDashboard() {
                     <p className="text-muted">No attendance records available</p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full">
+                      <table className="w-full min-w-[500px]">
                         <thead>
                           <tr className="border-b border-gray-200">
                             <th className="px-4 py-2 text-left text-sm font-medium text-text">Date</th>

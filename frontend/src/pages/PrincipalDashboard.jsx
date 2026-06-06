@@ -118,7 +118,7 @@ export default function PrincipalDashboard() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="border-l-4 border-l-amber-500">
             <div className="flex items-center justify-between">
               <div>
@@ -177,12 +177,12 @@ export default function PrincipalDashboard() {
         </div>
 
         {/* Main Content */}
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-6 lg:gap-8 lg:grid-cols-3">
           {/* Left Column (2/3) */}
-          <div className="space-y-8 lg:col-span-2">
+          <div className="space-y-6 lg:space-y-8 lg:col-span-2">
             {/* School Metrics */}
             <Card title="School Metrics" subtitle="Key performance indicators">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border border-gray-200 p-4">
                   <p className="text-3xl font-bold text-text">{stats.totalStudents}</p>
                   <p className="text-sm text-muted">Total Enrollment</p>
@@ -269,7 +269,7 @@ export default function PrincipalDashboard() {
           </div>
 
           {/* Quick Links */}
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             <Card title="Quick Links">
               <div className="space-y-2">
                 <Link
