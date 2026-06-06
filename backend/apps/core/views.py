@@ -4,8 +4,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from apps.academics.permissions import IsAdminUser
-from .models import SchoolSettings
-from .serializers import SchoolSettingsSerializer, PublicSchoolSettingsSerializer
+from .models import SchoolSettings, ContentBlock
+from .serializers import SchoolSettingsSerializer, PublicSchoolSettingsSerializer, ContentBlockSerializer, PublicContentBlockSerializer
 
 
 class SchoolSettingsViewSet(viewsets.ViewSet):
@@ -58,4 +58,47 @@ class SchoolSettingsViewSet(viewsets.ViewSet):
         """
         settings = SchoolSettings.get_settings()
         serializer = PublicSchoolSettingsSerializer(settings)
+        return Response(serializer.data)
+
+
+class ContentBlockViewSet(viewsets.ModelViewSet):
+    """CMS content blocks management."""
+
+    serializer_class = ContentBlockSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """Admin-only for write operations, read-only for authenticated users."""
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        """Filter by section if provided."""
+        queryset = ContentBlock.objects.all()
+        section = self.request.query_params.get('section')
+        if section:
+            queryset = queryset.filter(section=section)
+        return queryset
+
+    def perform_create(self, serializer):
+        """Set updated_by to current user on create."""
+        serializer.save(updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        """Set updated_by to current user on update."""
+        serializer.save(updated_by=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def public(self, request):
+        """
+        Get public content blocks (no authentication required).
+        Used for displaying CMS content on public pages.
+        """
+        queryset = ContentBlock.objects.filter(is_active=True)
+        section = self.request.query_params.get('section')
+        if section:
+            queryset = queryset.filter(section=section)
+        
+        serializer = PublicContentBlockSerializer(queryset, many=True)
         return Response(serializer.data)

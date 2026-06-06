@@ -75,6 +75,7 @@ const Reports = lazy(() => import('./pages/Reports'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const Messages = lazy(() => import('./pages/Messages'))
 const ParentDashboard = lazy(() => import('./pages/ParentDashboard'))
+const ContentEditor = lazy(() => import('./pages/ContentEditor'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -172,6 +173,10 @@ function App() {
               <Route
                 path="settings/notifications"
                 element={<NotificationSettings />}
+              />
+              <Route
+                path="content-editor"
+                element={<ContentEditor />}
               />
               <Route
                 path="people"

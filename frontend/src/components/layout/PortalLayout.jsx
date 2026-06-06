@@ -35,6 +35,7 @@ const NAV_BY_ROLE = {
     { to: '/reports', label: 'Reports' },
     { to: '/analytics', label: 'Analytics' },
     { to: '/messages', label: 'Messages' },
+    { to: '/content-editor', label: 'Content Editor' },
     { to: '/announcements', label: 'Announcements' },
     { to: '/settings', label: 'Settings' },
   ],

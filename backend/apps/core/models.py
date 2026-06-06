@@ -113,3 +113,59 @@ class SchoolSettings(models.Model):
             pk=cls.objects.first().pk if cls.objects.exists() else uuid.uuid4()
         )
         return settings
+
+
+class ContentBlock(models.Model):
+    """CMS content blocks for editable website content."""
+
+    BLOCK_TYPE_CHOICES = [
+        ("text", "Text"),
+        ("html", "HTML"),
+        ("markdown", "Markdown"),
+    ]
+
+    SECTION_CHOICES = [
+        ("home_hero", "Home - Hero Section"),
+        ("home_about", "Home - About Section"),
+        ("home_features", "Home - Features Section"),
+        ("about_mission", "About - Mission"),
+        ("about_vision", "About - Vision"),
+        ("about_history", "About - History"),
+        ("academics_jhs", "Academics - Junior High"),
+        ("academics_shs", "Academics - Senior High"),
+        ("contact_info", "Contact - Information"),
+        ("contact_form", "Contact - Form Instructions"),
+        ("news_events", "News & Events - Featured"),
+        ("enrollment_info", "Enrollment - Information"),
+        ("footer", "Footer"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Unique identifier for this content block (e.g., 'home_hero_title')"
+    )
+    title = models.CharField(max_length=200, help_text="Human-readable title for the content block")
+    section = models.CharField(max_length=50, choices=SECTION_CHOICES, help_text="Website section this block belongs to")
+    content_type = models.CharField(max_length=20, choices=BLOCK_TYPE_CHOICES, default="text")
+    content = models.TextField(help_text="Content of the block (text, HTML, or Markdown)")
+    is_active = models.BooleanField(default=True, help_text="Whether this block is currently active")
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='content_updates'
+    )
+
+    class Meta:
+        ordering = ['section', 'key']
+        indexes = [
+            models.Index(fields=['section', 'is_active']),
+            models.Index(fields=['key']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.key})"

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SchoolSettings
+from .models import SchoolSettings, ContentBlock
 
 
 class SchoolSettingsSerializer(serializers.ModelSerializer):
@@ -72,7 +72,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
 
 class PublicSchoolSettingsSerializer(serializers.ModelSerializer):
     """Public-facing school settings (no sensitive data)."""
-    
+
     class Meta:
         model = SchoolSettings
         fields = [
@@ -86,3 +86,38 @@ class PublicSchoolSettingsSerializer(serializers.ModelSerializer):
             'enrollment_start_date',
             'enrollment_end_date',
         ]
+
+
+class ContentBlockSerializer(serializers.ModelSerializer):
+    """Serializer for CMS content blocks."""
+
+    section_display = serializers.CharField(source="get_section_display", read_only=True)
+    content_type_display = serializers.CharField(source="get_content_type_display", read_only=True)
+    updated_by_name = serializers.CharField(source="updated_by.display_name", read_only=True)
+
+    class Meta:
+        model = ContentBlock
+        fields = [
+            "id",
+            "key",
+            "title",
+            "section",
+            "section_display",
+            "content_type",
+            "content_type_display",
+            "content",
+            "is_active",
+            "updated_at",
+            "updated_by",
+            "updated_by_name",
+        ]
+        read_only_fields = ["id", "updated_at", "updated_by"]
+
+
+class PublicContentBlockSerializer(serializers.ModelSerializer):
+    """Public-facing content block serializer (read-only)."""
+
+    class Meta:
+        model = ContentBlock
+        fields = ["key", "title", "content", "content_type"]
+        read_only_fields = fields
