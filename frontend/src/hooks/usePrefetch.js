@@ -163,50 +163,18 @@ export function usePrefetch() {
   /**
    * Prefetch all common data for a logged-in user
    * Call this after successful login
+   * NOTE: Disabled to prevent 429 rate limiting errors
    */
   const prefetchCommonData = (user) => {
     if (!user) return
 
-    // Prefetch dashboard based on role
-    prefetchDashboard(user.role)
-
-    // Prefetch academic year (needed by most dashboards)
-    prefetchAcademicYear()
-
-    // Prefetch announcements (shown in all dashboards)
-    prefetchAnnouncements({ limit: 5 })
-
-    // Role-specific prefetching
-    if (user.role === 'admin' || user.role === 'principal') {
-      // Prefetch students and teachers for admin users
-      prefetchStudents()
-      prefetchTeachers()
-      prefetchClasses()
-    }
-
-    if (user.role === 'teacher') {
-      // Prefetch today's schedule for teachers
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.schedule.today(),
-        queryFn: async () => {
-          const { data } = await api.get('/schedule/today/')
-          return Array.isArray(data) ? data : []
-        },
-        staleTime: 30 * 60 * 1000,
-      })
-    }
-
-    if (user.role === 'student') {
-      // Prefetch attendance summary for students
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.attendance.summary(),
-        queryFn: async () => {
-          const { data } = await api.get('/attendance/summary/')
-          return data
-        },
-        staleTime: 5 * 60 * 1000,
-      })
-    }
+    // Prefetching disabled to avoid rate limiting (429 errors)
+    // Data will be fetched on-demand when navigating to pages
+    // TanStack Query will cache data automatically after first fetch
+    
+    // If you want to re-enable prefetching, do it selectively:
+    // prefetchDashboard(user.role)
+    // prefetchAcademicYear()
   }
 
   return {

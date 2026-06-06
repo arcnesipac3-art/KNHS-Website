@@ -1,14 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api, { clearAccessToken, setAccessToken } from '../../lib/api'
 import { logAuthState } from '../../utils/devtools'
-import { usePrefetch } from '../../hooks/usePrefetch'
 
 export const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const { prefetchCommonData } = usePrefetch()
 
   const bootstrap = useCallback(async () => {
     logAuthState('bootstrap:start', { timestamp: new Date().toISOString() })
@@ -19,8 +17,6 @@ export function AuthProvider({ children }) {
       const me = await api.get('/auth/me/')
       logAuthState('bootstrap:user-loaded', { user: me.data })
       setUser(me.data)
-      // Prefetch common data after successful authentication
-      prefetchCommonData(me.data)
     } catch (error) {
       logAuthState('bootstrap:failed', { error: error.message, status: error.response?.status })
       clearAccessToken()
@@ -29,7 +25,7 @@ export function AuthProvider({ children }) {
       setLoading(false)
       logAuthState('bootstrap:complete', {})
     }
-  }, [prefetchCommonData])
+  }, [])
 
   useEffect(() => {
     bootstrap()
@@ -41,8 +37,6 @@ export function AuthProvider({ children }) {
     logAuthState('login:success', { user: data.user, access_token: data.access_token?.substring(0, 20) + '...' })
     setAccessToken(data.access_token)
     setUser(data.user)
-    // Prefetch common data after successful login
-    prefetchCommonData(data.user)
     return data.user
   }
 
