@@ -259,7 +259,7 @@ class CreateMessageThreadSerializer(serializers.Serializer):
         help_text="List of user IDs to include in the thread"
     )
     subject = serializers.CharField(max_length=200, required=False, allow_blank=True)
-    initial_message = serializers.CharField(required=True)
+    initial_message = serializers.CharField(required=True, allow_blank=True)
 
     def validate_participant_ids(self, value):
         """Validate that all participant IDs exist and are not the current user."""

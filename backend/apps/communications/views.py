@@ -335,6 +335,12 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
         # Users can only access threads they participate in.
         # Simplified query to avoid Subquery issues
         user = self.request.user
+        from django.db.models import Subquery, OuterRef
+
+        last_message = Message.objects.filter(
+            thread=OuterRef("pk")
+        ).order_by("-created_at")
+
         return (
             MessageThread.objects.filter(participants=user)
             .prefetch_related("participants", "participants__profile")
@@ -343,6 +349,12 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
                     "messages",
                     filter=Q(messages__is_read=False) & ~Q(messages__sender=user),
                 ),
+                last_message_id=Subquery(last_message.values("id")[:1]),
+                last_message_sender_id=Subquery(last_message.values("sender_id")[:1]),
+                last_message_sender_name=Subquery(last_message.values("sender__display_name")[:1]),
+                last_message_sender_email=Subquery(last_message.values("sender__email")[:1]),
+                last_message_content=Subquery(last_message.values("content")[:1]),
+                last_message_created_at=Subquery(last_message.values("created_at")[:1]),
             )
         )
 
