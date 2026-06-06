@@ -14,6 +14,7 @@ export default function Messages() {
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [messagesLoading, setMessagesLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [searchUsers, setSearchUsers] = useState('')
@@ -23,7 +24,6 @@ export default function Messages() {
   const [initialMessage, setInitialMessage] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [friends, setFriends] = useState([])
-  const [loadingFriends, setLoadingFriends] = useState(false)
   const [socketConnected, setSocketConnected] = useState(false)
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const messagesEndRef = useRef(null)
@@ -32,6 +32,9 @@ export default function Messages() {
   const subscribedThreadRef = useRef(null)
   const selectedThreadRef = useRef(null)
   const debounceTimeoutRef = useRef(null)
+  const messageCacheRef = useRef(new Map())
+  const activeMessagesRequestRef = useRef(0)
+  const activeUserSearchRef = useRef(0)
 
   useEffect(() => {
     loadThreads()
@@ -51,7 +54,9 @@ export default function Messages() {
   useEffect(() => {
     if (selectedThread) {
       loadMessages(selectedThread.id)
-      markThreadRead(selectedThread.id)
+      if (selectedThread.unread_count > 0) {
+        markThreadRead(selectedThread.id)
+      }
     }
   }, [selectedThread])
 
@@ -124,7 +129,14 @@ export default function Messages() {
 
         if (payload.type === 'message.created') {
           if (payload.thread_id === selectedThreadRef.current?.id) {
-            setMessages((prev) => upsertMessage(prev, payload.message))
+            const nextMessages = reconcileMessage(
+              messageCacheRef.current.get(payload.thread_id) || [],
+              payload.message,
+              payload.client_id,
+              user
+            )
+            messageCacheRef.current.set(payload.thread_id, nextMessages)
+            setMessages(nextMessages)
             if (payload.message.sender !== user?.id && payload.message.sender_email !== user?.email) {
               markThreadRead(payload.thread_id, { silent: true })
             }
@@ -133,8 +145,7 @@ export default function Messages() {
         }
 
         if (payload.type === 'thread.updated') {
-          setThreads((prev) => sortThreads(upsertThread(prev, payload.thread)))
-          setSelectedThread((prev) => (prev?.id === payload.thread.id ? payload.thread : prev))
+          applyThreadUpdate(payload.thread)
         }
       }
 
@@ -195,10 +206,45 @@ export default function Messages() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
+  const applyThreadUpdate = useCallback((thread) => {
+    setThreads((prev) => sortThreads(upsertThread(prev, thread)))
+    setSelectedThread((prev) => (prev?.id === thread.id ? thread : prev))
+  }, [])
+
+  const updateCachedMessages = useCallback((threadId, nextMessages) => {
+    messageCacheRef.current.set(threadId, nextMessages)
+    if (selectedThreadRef.current?.id === threadId) {
+      setMessages(nextMessages)
+    }
+  }, [])
+
+  const promoteThreadLocally = useCallback((threadId, message) => {
+    const previewThread = {
+      ...selectedThreadRef.current,
+      id: threadId,
+      updated_at: message.created_at,
+      unread_count: 0,
+      last_message: {
+        id: message.id,
+        thread: threadId,
+        sender: message.sender,
+        sender_name: message.sender_name,
+        sender_email: message.sender_email,
+        content: message.content,
+        is_read: true,
+        created_at: message.created_at,
+      },
+    }
+    applyThreadUpdate(previewThread)
+  }, [applyThreadUpdate])
+
   async function loadAvailableUsers() {
+    const requestId = activeUserSearchRef.current + 1
+    activeUserSearchRef.current = requestId
     setLoadingUsers(true)
     try {
       const response = await api.get('/users/', { params: { search: debouncedSearch } })
+      if (requestId !== activeUserSearchRef.current) return
       const users = Array.isArray(response.data) ? response.data : (response.data?.results ?? [])
       // Filter out current user and already selected participants
       const filtered = users.filter(u => 
@@ -213,7 +259,6 @@ export default function Messages() {
   }
 
   async function loadFriends() {
-    setLoadingFriends(true)
     try {
       const response = await api.get('/friendships/my_friends/')
       const friendsList = response.data || []
@@ -225,8 +270,6 @@ export default function Messages() {
     } catch (error) {
       console.error('Failed to load friends:', error)
       setFriends([])
-    } finally {
-      setLoadingFriends(false)
     }
   }
 
@@ -242,11 +285,31 @@ export default function Messages() {
   }
 
   async function loadMessages(threadId) {
+    const cachedMessages = messageCacheRef.current.get(threadId)
+    if (cachedMessages) {
+      setMessages(cachedMessages)
+      setMessagesLoading(false)
+      return
+    }
+
+    const requestId = activeMessagesRequestRef.current + 1
+    activeMessagesRequestRef.current = requestId
+    setMessagesLoading(true)
     try {
       const response = await api.get(`/messages/?thread=${threadId}`)
-      setMessages(dedupeMessages(response.data.results || response.data))
+      if (requestId !== activeMessagesRequestRef.current) return
+      const nextMessages = dedupeMessages(response.data.results || response.data)
+      messageCacheRef.current.set(threadId, nextMessages)
+      setMessages(nextMessages)
     } catch (error) {
       console.error('Failed to load messages:', error)
+      if (requestId === activeMessagesRequestRef.current) {
+        setMessages([])
+      }
+    } finally {
+      if (requestId === activeMessagesRequestRef.current) {
+        setMessagesLoading(false)
+      }
     }
   }
 
@@ -269,7 +332,28 @@ export default function Messages() {
     if (!newMessage.trim() || !selectedThread) return
 
     const content = newMessage.trim()
+    const clientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const optimisticMessage = {
+      id: clientId,
+      thread: selectedThread.id,
+      sender: user?.id,
+      sender_name: user?.display_name || user?.email || 'You',
+      sender_email: user?.email,
+      content,
+      is_read: true,
+      created_at: new Date().toISOString(),
+      pending: true,
+    }
+
     setNewMessage('')
+    const optimisticMessages = reconcileMessage(
+      messageCacheRef.current.get(selectedThread.id) || [],
+      optimisticMessage,
+      clientId,
+      user
+    )
+    updateCachedMessages(selectedThread.id, optimisticMessages)
+    promoteThreadLocally(selectedThread.id, optimisticMessage)
 
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(
@@ -277,6 +361,7 @@ export default function Messages() {
           type: 'message.send',
           thread_id: selectedThread.id,
           content,
+          client_id: clientId,
         })
       )
       return
@@ -288,11 +373,22 @@ export default function Messages() {
         thread: selectedThread.id,
         content,
       })
-      setMessages((prev) => upsertMessage(prev, response.data))
+      const nextMessages = reconcileMessage(
+        messageCacheRef.current.get(selectedThread.id) || [],
+        response.data,
+        clientId,
+        user
+      )
+      updateCachedMessages(selectedThread.id, nextMessages)
+      promoteThreadLocally(selectedThread.id, response.data)
       await markThreadRead(selectedThread.id, { silent: true })
-      loadThreads()
     } catch (error) {
       console.error('Failed to send message:', error)
+      const rolledBackMessages = removePendingMessage(
+        messageCacheRef.current.get(selectedThread.id) || [],
+        clientId
+      )
+      updateCachedMessages(selectedThread.id, rolledBackMessages)
       setNewMessage(content)
       alert('Failed to send message. Please try again.')
     } finally {
@@ -306,6 +402,7 @@ export default function Messages() {
     }
     try {
       await api.delete(`/message-threads/${threadId}/delete_conversation/`)
+      messageCacheRef.current.delete(threadId)
       setThreads(prev => prev.filter(t => t.id !== threadId))
       if (selectedThread?.id === threadId) {
         setSelectedThread(null)
@@ -341,7 +438,8 @@ export default function Messages() {
       setInitialMessage('')
       setSearchUsers('')
       setAvailableUsers([])
-      setThreads((prev) => sortThreads(upsertThread(prev, thread)))
+      messageCacheRef.current.delete(thread.id)
+      applyThreadUpdate(thread)
       setSelectedThread(thread)
     } catch (error) {
       console.error('Failed to start conversation:', error)
@@ -398,6 +496,10 @@ export default function Messages() {
     return selectedThread.subject || otherParticipants.map((p) => p.name).join(', ')
   }, [selectedThread])
 
+  const socketStatusLabel = socketConnected
+    ? 'Live sync is on'
+    : 'Live sync is unavailable. Sending still works.'
+
   return (
     <PortalLayout>
       <div className="h-[calc(100vh-8rem)]">
@@ -407,7 +509,7 @@ export default function Messages() {
             <h1 className="text-2xl font-bold text-text">Messages</h1>
             <p className="text-sm text-muted">Direct messaging with teachers and students</p>
             <p className={`mt-1 text-xs ${socketConnected ? 'text-green-600' : 'text-amber-600'}`}>
-              {socketConnected ? 'Live updates connected' : 'Reconnecting live updates...'}
+              {socketStatusLabel}
             </p>
           </div>
           <Button onClick={() => setShowNewConversation(true)}>
@@ -504,9 +606,7 @@ export default function Messages() {
                   </svg>
                 </div>
                 {loadingUsers && (
-                  <div className="mt-2 flex items-center justify-center py-2">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-knhs-purple border-t-transparent"></div>
-                  </div>
+                  <p className="mt-2 text-xs text-muted">Searching people...</p>
                 )}
                 {searchUsers.length >= 2 && availableUsers.length > 0 && (
                   <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white">
@@ -581,8 +681,8 @@ export default function Messages() {
             </div>
             <div className="overflow-y-auto">
               {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-knhs-purple border-t-transparent"></div>
+                <div className="p-4 text-sm text-muted">
+                  Loading conversations...
                 </div>
               ) : threads.length === 0 ? (
                 <div className="p-8 text-center">
@@ -678,7 +778,11 @@ export default function Messages() {
 
                 {/* Messages */}
                 <div className="flex h-[calc(100%-140px)] flex-col overflow-y-auto p-4">
-                  {messages.length === 0 ? (
+                  {messagesLoading ? (
+                    <div className="flex h-full items-center justify-center">
+                      <p className="text-sm text-muted">Loading conversation...</p>
+                    </div>
+                  ) : messages.length === 0 ? (
                     <div className="flex h-full items-center justify-center">
                       <p className="text-muted">No messages yet. Start the conversation!</p>
                     </div>
@@ -705,9 +809,10 @@ export default function Messages() {
                                 >
                                   <p className="text-sm">{message.content}</p>
                                 </div>
-                                <span className="mt-1 text-xs text-muted">
-                                  {formatMessageTime(message.created_at)}
-                                </span>
+                                <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                                  <span>{formatMessageTime(message.created_at)}</span>
+                                  {message.pending && <span>Sending...</span>}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -733,16 +838,9 @@ export default function Messages() {
                       disabled={sending || !newMessage.trim()}
                       className="rounded-full"
                     >
-                      {sending ? (
-                        <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      ) : (
-                        <svg className="h-5 w-5 rotate-90" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M2.01 21L23 12 2.01 3 2 10l15-2-15-2z" />
-                        </svg>
-                      )}
+                      <svg className="h-5 w-5 rotate-90" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15-2-15-2z" />
+                      </svg>
                     </Button>
                   </form>
                 </div>
@@ -777,6 +875,29 @@ function dedupeMessages(items) {
 function upsertMessage(messages, message) {
   const next = dedupeMessages([...(messages || []), message])
   return next.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+}
+
+function reconcileMessage(messages, message, clientId, currentUser) {
+  const next = [...(messages || [])]
+  const optimisticIndex = next.findIndex((item) =>
+    item.id === clientId ||
+    (
+      item.pending &&
+      item.sender === currentUser?.id &&
+      item.content === message.content
+    )
+  )
+
+  if (optimisticIndex >= 0) {
+    next[optimisticIndex] = { ...message, pending: false }
+    return next.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  }
+
+  return upsertMessage(next, { ...message, pending: false })
+}
+
+function removePendingMessage(messages, clientId) {
+  return (messages || []).filter((message) => message.id !== clientId)
 }
 
 function upsertThread(threads, thread) {

@@ -1,5 +1,5 @@
 from django.core.cache import cache
-from django.db.models import Q
+from django.db.models import Count, OuterRef, Q, Subquery
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -332,11 +332,27 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Users can only access threads they participate in
-        # Don't prefetch messages here - load them on demand for better performance
-        return MessageThread.objects.filter(
-            participants=self.request.user
-        ).prefetch_related('participants', 'participants__profile')
+        # Users can only access threads they participate in.
+        # Annotate last-message fields so the thread list does not trigger
+        # one query per conversation in the serializer.
+        user = self.request.user
+        latest_message = Message.objects.filter(thread=OuterRef("pk")).order_by("-created_at")
+        return (
+            MessageThread.objects.filter(participants=user)
+            .prefetch_related("participants", "participants__profile")
+            .annotate(
+                unread_count_value=Count(
+                    "messages",
+                    filter=Q(messages__is_read=False) & ~Q(messages__sender=user),
+                ),
+                last_message_id=Subquery(latest_message.values("id")[:1]),
+                last_message_content=Subquery(latest_message.values("content")[:1]),
+                last_message_created_at=Subquery(latest_message.values("created_at")[:1]),
+                last_message_sender_id=Subquery(latest_message.values("sender_id")[:1]),
+                last_message_sender_name=Subquery(latest_message.values("sender__display_name")[:1]),
+                last_message_sender_email=Subquery(latest_message.values("sender__email")[:1]),
+            )
+        )
 
     def perform_create(self, serializer):
         # Add current user as a participant when creating a thread
@@ -402,12 +418,13 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Users can only access messages from threads they participate in
-        user_threads = MessageThread.objects.filter(participants=self.request.user)
-        queryset = Message.objects.filter(thread__in=user_threads).select_related('sender', 'thread')
+        queryset = Message.objects.filter(thread__participants=self.request.user).select_related(
+            "sender", "thread"
+        )
         thread_id = self.request.query_params.get("thread")
         if thread_id:
             queryset = queryset.filter(thread_id=thread_id)
-        return queryset
+        return queryset.distinct()
 
     def create(self, request, *args, **kwargs):
         thread_id = request.data.get("thread")
