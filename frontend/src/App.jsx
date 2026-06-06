@@ -7,6 +7,8 @@ import PublicLayout from './components/layout/PublicLayout'
 import DebugPanel from './components/ui/DebugPanel'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import LoadingSpinner from './components/ui/LoadingSpinner'
+import { initPostHog } from './lib/analytics'
+import { initSentry } from './lib/sentry'
 
 // Keep the Render free-tier backend alive — ping /api/health/ (no DB, no auth, <5ms)
 // every 9 minutes so the server never hits the 15-min inactivity sleep threshold.
@@ -89,6 +91,12 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  // Initialize analytics and error tracking
+  useEffect(() => {
+    initPostHog()
+    initSentry()
+  }, [])
+
   useKeepAlive()
   return (
     <ErrorBoundary>

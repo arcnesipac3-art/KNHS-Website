@@ -328,3 +328,25 @@ if DEBUG:
         "SHOW_COLLAPSED": True,
         "SHOW_TEMPLATE_CONTEXT": True,
     }
+
+# ── PostHog Analytics ─────────────────────────────────────────────────────
+POSTHOG_PROJECT_ID = os.getenv("POSTHOG_PROJECT_ID", "")
+POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://app.posthog.com")
+POSTHOG_ENABLED = bool(POSTHOG_PROJECT_ID) and not DEBUG
+
+# ── Sentry Error Tracking ───────────────────────────────────────────────────
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+SENTRY_ENABLED = bool(SENTRY_DSN) and not DEBUG
+
+if SENTRY_ENABLED:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
+        profiles_sample_rate=0.1,  # 10% of profiles for performance monitoring
+        environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+        send_default_pii=False,  # Don't send personally identifiable information
+    )
