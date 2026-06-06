@@ -10,6 +10,7 @@ export default function RegistrarDashboard() {
   const { user } = useAuth()
   const [stats, setStats] = useState(null)
   const [recentApplications, setRecentApplications] = useState([])
+  const [studentStats, setStudentStats] = useState({ total: 0, active: 0, byGrade: {} })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,8 +18,9 @@ export default function RegistrarDashboard() {
   }, [])
 
   async function loadData() {
-    const [enrollRes] = await Promise.allSettled([
+    const [enrollRes, studentRes] = await Promise.allSettled([
       api.get('/enrollment-applications/', { params: { page_size: 10 } }),
+      api.get('/users/', { params: { role: 'student' } }),
     ])
 
     if (enrollRes.status === 'fulfilled') {
@@ -27,12 +29,25 @@ export default function RegistrarDashboard() {
       setRecentApplications(apps)
 
       // Compute stats from the list
-      setStats({
+      setStats(prev => ({
+        ...prev,
         total: d?.count ?? apps.length,
         pending: apps.filter(a => a.status === 'pending').length,
         under_review: apps.filter(a => a.status === 'under_review').length,
         approved: apps.filter(a => a.status === 'approved').length,
         rejected: apps.filter(a => a.status === 'rejected').length,
+      }))
+    }
+
+    if (studentRes.status === 'fulfilled') {
+      const students = Array.isArray(studentRes.value.data) ? studentRes.value.data : (studentRes.value.data?.results ?? [])
+      setStudentStats({
+        total: students.length,
+        active: students.filter(s => s.is_active).length,
+        byGrade: students.reduce((acc, s) => {
+          acc[s.grade_level] = (acc[s.grade_level] || 0) + 1
+          return acc
+        }, {}),
       })
     }
 
@@ -58,9 +73,12 @@ export default function RegistrarDashboard() {
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Header */}
         <div className="rounded-2xl bg-gradient-to-r from-amber-500 to-amber-700 p-6 text-white shadow-lg">
-          <p className="text-sm opacity-90">Registrar</p>
+          <p className="text-sm opacity-90">Welcome back, Registrar</p>
           <h1 className="text-3xl font-bold">{user?.display_name || user?.email}</h1>
           <p className="mt-1 text-amber-100">Enrollment Queue & Student Records</p>
+          <p className="mt-2 text-sm text-amber-200">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
         </div>
 
         {/* Quick actions */}
@@ -78,7 +96,7 @@ export default function RegistrarDashboard() {
 
         {/* Stats */}
         {!loading && stats && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Card className="border-l-4 border-l-gray-400">
               <p className="text-2xl font-bold text-text">{stats.pending}</p>
               <p className="text-sm text-muted">Pending Review</p>
@@ -99,6 +117,10 @@ export default function RegistrarDashboard() {
             <Card className="border-l-4 border-l-red-500">
               <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
               <p className="text-sm text-muted">Rejected</p>
+            </Card>
+            <Card className="border-l-4 border-l-purple-500">
+              <p className="text-2xl font-bold text-text">{studentStats.total}</p>
+              <p className="text-sm text-muted">Total Students</p>
             </Card>
           </div>
         )}
@@ -147,6 +169,33 @@ export default function RegistrarDashboard() {
 
           {/* Quick links */}
           <div className="space-y-4">
+            {/* Student Statistics */}
+            <Card title="Student Statistics" subtitle="Current enrollment by grade">
+              {!loading && studentStats.total > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted">Total Students</span>
+                    <span className="font-semibold text-text">{studentStats.total}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted">Active Students</span>
+                    <span className="font-semibold text-green-600">{studentStats.active}</span>
+                  </div>
+                  <div className="mt-3 border-t border-gray-200 pt-3">
+                    <p className="text-xs font-medium text-muted mb-2">By Grade Level</p>
+                    {Object.entries(studentStats.byGrade).sort(([a], [b]) => a - b).map(([grade, count]) => (
+                      <div key={grade} className="flex justify-between text-sm">
+                        <span className="text-muted">Grade {grade}</span>
+                        <span className="font-semibold text-text">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted">Unable to load student statistics.</p>
+              )}
+            </Card>
+
             <Card title="Registrar Tools">
               <div className="space-y-2">
                 {[
