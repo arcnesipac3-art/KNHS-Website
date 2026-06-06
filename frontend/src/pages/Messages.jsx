@@ -290,6 +290,23 @@ export default function Messages() {
     }
   }
 
+  async function handleDeleteConversation(threadId) {
+    if (!window.confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
+      return
+    }
+    try {
+      await api.delete(`/message-threads/${threadId}/delete_conversation/`)
+      setThreads(prev => prev.filter(t => t.id !== threadId))
+      if (selectedThread?.id === threadId) {
+        setSelectedThread(null)
+        setMessages([])
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error)
+      alert('Failed to delete conversation. Please try again.')
+    }
+  }
+
   async function handleStartConversation(e) {
     e.preventDefault()
     if (selectedParticipants.length === 0) {
@@ -574,12 +591,14 @@ export default function Messages() {
                     return (
                       <div
                         key={thread.id}
-                        onClick={() => setSelectedThread(thread)}
-                        className={`cursor-pointer p-4 transition-colors hover:bg-gray-50 ${
+                        className={`group relative cursor-pointer p-4 transition-colors hover:bg-gray-50 ${
                           selectedThread?.id === thread.id ? 'bg-purple-50' : ''
                         }`}
                       >
-                        <div className="flex items-start gap-3">
+                        <div
+                          onClick={() => setSelectedThread(thread)}
+                          className="flex items-start gap-3"
+                        >
                           <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white ${getAvatarColor(displayName)}`}>
                             {getAvatar(displayName)}
                           </div>
@@ -606,6 +625,18 @@ export default function Messages() {
                             </span>
                           )}
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteConversation(thread.id)
+                          }}
+                          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 transition-opacity"
+                          title="Delete conversation"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     )
                   })}

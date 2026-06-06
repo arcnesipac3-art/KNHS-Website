@@ -333,9 +333,10 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Users can only access threads they participate in
+        # Don't prefetch messages here - load them on demand for better performance
         return MessageThread.objects.filter(
             participants=self.request.user
-        ).prefetch_related('participants', 'participants__profile', 'messages', 'messages__sender')
+        ).prefetch_related('participants', 'participants__profile')
 
     def perform_create(self, serializer):
         # Add current user as a participant when creating a thread
@@ -377,6 +378,20 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
         thread.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
         broadcast_thread_updated(thread)
         return Response({"message": "Messages marked as read"})
+
+    @action(detail=True, methods=["delete"])
+    def delete_conversation(self, request, pk=None):
+        """Delete a conversation thread and all its messages."""
+        thread = self.get_object()
+        # Check if user is a participant
+        if not thread.participants.filter(id=request.user.id).exists():
+            return Response(
+                {"error": "You can only delete conversations you participate in"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        thread_id = thread.id
+        thread.delete()
+        return Response({"message": "Conversation deleted", "thread_id": thread_id})
 
 
 class MessageViewSet(viewsets.ModelViewSet):
