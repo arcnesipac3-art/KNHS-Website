@@ -132,13 +132,14 @@ export default function Messages() {
         }, 25000)
 
         if (selectedThreadRef.current?.id) {
+          const currentId = Number(selectedThreadRef.current.id)
           socket.send(
             JSON.stringify({
               type: 'thread.subscribe',
-              thread_id: selectedThreadRef.current.id,
+              thread_id: currentId,
             })
           )
-          subscribedThreadRef.current = selectedThreadRef.current.id
+          subscribedThreadRef.current = currentId
         }
       }
 
@@ -156,17 +157,20 @@ export default function Messages() {
         }
 
         if (payload.type === 'message.created') {
-          if (payload.thread_id === selectedThreadRef.current?.id) {
+          const payloadThreadId = payload.thread_id ? Number(payload.thread_id) : null
+          const currentThreadId = selectedThreadRef.current?.id ? Number(selectedThreadRef.current.id) : null
+          
+          if (payloadThreadId && payloadThreadId === currentThreadId) {
             const nextMessages = reconcileMessage(
-              messageCacheRef.current.get(payload.thread_id) || [],
+              messageCacheRef.current.get(payloadThreadId) || [],
               payload.message,
               payload.client_id,
               user
             )
-            messageCacheRef.current.set(payload.thread_id, nextMessages)
+            messageCacheRef.current.set(payloadThreadId, nextMessages)
             setMessages(nextMessages)
             if (payload.message.sender !== user?.id && payload.message.sender_email !== user?.email) {
-              markThreadRead(payload.thread_id, { silent: true })
+              markThreadRead(payloadThreadId, { silent: true })
             }
           }
           return
@@ -245,19 +249,22 @@ export default function Messages() {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN) return
 
-    if (subscribedThreadRef.current && subscribedThreadRef.current !== selectedThread?.id) {
+    const selectedId = selectedThread?.id ? Number(selectedThread.id) : null
+    const subscribedId = subscribedThreadRef.current ? Number(subscribedThreadRef.current) : null
+
+    if (subscribedId && subscribedId !== selectedId) {
       socket.send(
         JSON.stringify({
           type: 'thread.unsubscribe',
-          thread_id: subscribedThreadRef.current,
+          thread_id: subscribedId,
         })
       )
       subscribedThreadRef.current = null
     }
 
-    if (selectedThread?.id) {
-      socket.send(JSON.stringify({ type: 'thread.subscribe', thread_id: selectedThread.id }))
-      subscribedThreadRef.current = selectedThread.id
+    if (selectedId) {
+      socket.send(JSON.stringify({ type: 'thread.subscribe', thread_id: selectedId }))
+      subscribedThreadRef.current = selectedId
     }
   }, [selectedThread?.id])
 
@@ -267,25 +274,27 @@ export default function Messages() {
 
   const applyThreadUpdate = useCallback((thread) => {
     setThreads((prev) => sortThreads(upsertThread(prev, thread)))
-    setSelectedThread((prev) => (prev?.id === thread.id ? thread : prev))
+    setSelectedThread((prev) => (Number(prev?.id) === Number(thread.id) ? thread : prev))
   }, [])
 
   const updateCachedMessages = useCallback((threadId, nextMessages) => {
-    messageCacheRef.current.set(threadId, nextMessages)
-    if (selectedThreadRef.current?.id === threadId) {
+    const normId = Number(threadId)
+    messageCacheRef.current.set(normId, nextMessages)
+    if (selectedThreadRef.current?.id && Number(selectedThreadRef.current.id) === normId) {
       setMessages(nextMessages)
     }
   }, [])
 
   const promoteThreadLocally = useCallback((threadId, message) => {
+    const normId = Number(threadId)
     const previewThread = {
       ...selectedThreadRef.current,
-      id: threadId,
+      id: normId,
       updated_at: message.created_at,
       unread_count: 0,
       last_message: {
         id: message.id,
-        thread: threadId,
+        thread: normId,
         sender: message.sender,
         sender_name: message.sender_name,
         sender_email: message.sender_email,
@@ -344,7 +353,8 @@ export default function Messages() {
   }
 
   async function loadMessages(threadId) {
-    const cachedMessages = messageCacheRef.current.get(threadId)
+    const normId = Number(threadId)
+    const cachedMessages = messageCacheRef.current.get(normId)
     if (cachedMessages) {
       setMessages(cachedMessages)
       setMessagesLoading(false)
@@ -355,10 +365,10 @@ export default function Messages() {
     activeMessagesRequestRef.current = requestId
     setMessagesLoading(true)
     try {
-      const response = await api.get(`/messages/?thread=${threadId}`)
+      const response = await api.get(`/messages/?thread=${normId}`)
       if (requestId !== activeMessagesRequestRef.current) return
       const nextMessages = dedupeMessages(response.data.results || response.data)
-      messageCacheRef.current.set(threadId, nextMessages)
+      messageCacheRef.current.set(normId, nextMessages)
       setMessages(nextMessages)
     } catch (error) {
       console.error('Failed to load messages:', error)
@@ -373,12 +383,13 @@ export default function Messages() {
   }
 
   async function markThreadRead(threadId, options = {}) {
+    const normId = Number(threadId)
     try {
-      await api.post(`/message-threads/${threadId}/mark_read/`)
+      await api.post(`/message-threads/${normId}/mark_read/`)
       setThreads((prev) =>
-        prev.map((thread) => (thread.id === threadId ? { ...thread, unread_count: 0 } : thread))
+        prev.map((thread) => (Number(thread.id) === normId ? { ...thread, unread_count: 0 } : thread))
       )
-      setSelectedThread((prev) => (prev?.id === threadId ? { ...prev, unread_count: 0 } : prev))
+      setSelectedThread((prev) => (Number(prev?.id) === normId ? { ...prev, unread_count: 0 } : prev))
     } catch (error) {
       if (!options.silent) {
         console.error('Failed to mark thread as read:', error)
@@ -394,7 +405,7 @@ export default function Messages() {
     const clientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const optimisticMessage = {
       id: clientId,
-      thread: selectedThread.id,
+      thread: Number(selectedThread.id),
       sender: user?.id,
       sender_name: user?.display_name || user?.email || 'You',
       sender_email: user?.email,
@@ -406,19 +417,19 @@ export default function Messages() {
 
     setNewMessage('')
     const optimisticMessages = reconcileMessage(
-      messageCacheRef.current.get(selectedThread.id) || [],
+      messageCacheRef.current.get(Number(selectedThread.id)) || [],
       optimisticMessage,
       clientId,
       user
     )
-    updateCachedMessages(selectedThread.id, optimisticMessages)
-    promoteThreadLocally(selectedThread.id, optimisticMessage)
+    updateCachedMessages(Number(selectedThread.id), optimisticMessages)
+    promoteThreadLocally(Number(selectedThread.id), optimisticMessage)
 
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(
         JSON.stringify({
           type: 'message.send',
-          thread_id: selectedThread.id,
+          thread_id: Number(selectedThread.id),
           content,
           client_id: clientId,
         })
@@ -429,25 +440,25 @@ export default function Messages() {
     setSending(true)
     try {
       const response = await api.post('/messages/', {
-        thread: selectedThread.id,
+        thread: Number(selectedThread.id),
         content,
       })
       const nextMessages = reconcileMessage(
-        messageCacheRef.current.get(selectedThread.id) || [],
+        messageCacheRef.current.get(Number(selectedThread.id)) || [],
         response.data,
         clientId,
         user
       )
-      updateCachedMessages(selectedThread.id, nextMessages)
-      promoteThreadLocally(selectedThread.id, response.data)
-      await markThreadRead(selectedThread.id, { silent: true })
+      updateCachedMessages(Number(selectedThread.id), nextMessages)
+      promoteThreadLocally(Number(selectedThread.id), response.data)
+      await markThreadRead(Number(selectedThread.id), { silent: true })
     } catch (error) {
       console.error('Failed to send message:', error)
       const rolledBackMessages = removePendingMessage(
-        messageCacheRef.current.get(selectedThread.id) || [],
+        messageCacheRef.current.get(Number(selectedThread.id)) || [],
         clientId
       )
-      updateCachedMessages(selectedThread.id, rolledBackMessages)
+      updateCachedMessages(Number(selectedThread.id), rolledBackMessages)
       setNewMessage(content)
       alert('Failed to send message. Please try again.')
     } finally {
@@ -459,11 +470,12 @@ export default function Messages() {
     if (!window.confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
       return
     }
+    const normId = Number(threadId)
     try {
-      await api.delete(`/message-threads/${threadId}/delete_conversation/`)
-      messageCacheRef.current.delete(threadId)
-      setThreads(prev => prev.filter(t => t.id !== threadId))
-      if (selectedThread?.id === threadId) {
+      await api.delete(`/message-threads/${normId}/delete_conversation/`)
+      messageCacheRef.current.delete(normId)
+      setThreads(prev => prev.filter(t => Number(t.id) !== normId))
+      if (selectedThread?.id && Number(selectedThread.id) === normId) {
         setSelectedThread(null)
         setMessages([])
       }
