@@ -35,6 +35,36 @@ export function clearAccessToken() {
   accessToken = null
 }
 
+function isTokenExpired(token) {
+  if (!token) return true
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.exp * 1000 < Date.now()
+  } catch {
+    return true
+  }
+}
+
+export async function ensureValidToken() {
+  if (!accessToken || isTokenExpired(accessToken)) {
+    if (!refreshPromise) {
+      refreshPromise = api.post('/auth/refresh/').finally(() => {
+        refreshPromise = null
+      })
+    }
+    try {
+      const { data } = await refreshPromise
+      setAccessToken(data.access_token)
+      return data.access_token
+    } catch {
+      clearAccessToken()
+      window.dispatchEvent(new CustomEvent('auth:session-expired'))
+      return null
+    }
+  }
+  return accessToken
+}
+
 api.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`

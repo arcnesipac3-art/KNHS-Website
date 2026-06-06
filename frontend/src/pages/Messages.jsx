@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import api, { getAccessToken, getWebSocketBaseUrl } from '../lib/api'
+import api, { getAccessToken, getWebSocketBaseUrl, ensureValidToken } from '../lib/api'
 
 export default function Messages() {
   const { user } = useAuth()
@@ -100,23 +100,22 @@ export default function Messages() {
     let reconnectAttempts = 0
     let heartbeatIntervalRef = null
 
-    function getToken() {
-      return getAccessToken()
+    async function getValidToken() {
+      return await ensureValidToken()
     }
 
     function connect() {
-      const token = getToken()
-      if (!token) {
-        if (!cancelled) {
+      getValidToken().then(token => {
+        if (cancelled) return
+        if (!token) {
           reconnectTimeoutRef.current = window.setTimeout(connect, 1000)
+          return
         }
-        return
-      }
 
-      const socket = new WebSocket(
-        `${getWebSocketBaseUrl()}/ws/messages/?token=${encodeURIComponent(token)}`
-      )
-      socketRef.current = socket
+        const socket = new WebSocket(
+          `${getWebSocketBaseUrl()}/ws/messages/?token=${encodeURIComponent(token)}`
+        )
+        socketRef.current = socket
 
       socket.onopen = () => {
         if (cancelled) return
@@ -212,9 +211,10 @@ export default function Messages() {
           reconnectTimeoutRef.current = window.setTimeout(connect, backoff)
         }
       }
-    }
+    })
+  }
 
-    const handleSessionExpired = () => {
+  const handleSessionExpired = () => {
       reconnectAttempts = 0
       if (!cancelled) {
         connect()
