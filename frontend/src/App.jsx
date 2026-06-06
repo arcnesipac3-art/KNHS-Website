@@ -79,6 +79,9 @@ const Messages = lazy(() => import('./pages/Messages'))
 const Friends = lazy(() => import('./pages/Friends'))
 const ParentDashboard = lazy(() => import('./pages/ParentDashboard'))
 const ContentEditor = lazy(() => import('./pages/ContentEditor'))
+const ClassroomManagement = lazy(() => import('./pages/ClassroomManagement'))
+const SubjectAssignment = lazy(() => import('./pages/SubjectAssignment'))
+const StudentEnrollment = lazy(() => import('./pages/StudentEnrollment'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -229,6 +232,9 @@ function App() {
                 path="exports"
                 element={<Navigate to="/reports" replace />}
               />
+              <Route path="classrooms/manage" element={<ClassroomManagement />} />
+              <Route path="classrooms/:id/subjects" element={<SubjectAssignment />} />
+              <Route path="classrooms/:id/students" element={<StudentEnrollment />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

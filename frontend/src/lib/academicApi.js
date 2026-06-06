@@ -2,6 +2,7 @@
  * Academic Structure API Service
  * Sprint 2: Academic years, quarters, subjects, classrooms, enrollments
  * Added: Academic Calendar Management (years, quarters, events)
+ * Added: Admin classroom management functions
  */
 
 import api from './api'
@@ -334,4 +335,77 @@ export async function getClassroomDetails(classroomId) {
     subjects: Array.isArray(subjectsData) ? subjectsData : (subjectsData?.results ?? []),
     enrollments: Array.isArray(enrollmentsData) ? enrollmentsData : (enrollmentsData?.results ?? []),
   }
+}
+
+// ============================================================================
+// ADMIN CLASSROOM MANAGEMENT
+// ============================================================================
+
+/**
+ * Get all teachers for classroom assignment
+ */
+export async function getTeachers() {
+  const { data } = await api.get('/accounts/users/', { params: { role: 'teacher' } })
+  return Array.isArray(data) ? data : (data?.results ?? [])
+}
+
+/**
+ * Get all students for enrollment
+ */
+export async function getStudents(filters = {}) {
+  const { data } = await api.get('/accounts/users/', { params: { role: 'student', ...filters } })
+  return Array.isArray(data) ? data : (data?.results ?? [])
+}
+
+/**
+ * Create a new classroom (admin only)
+ */
+export async function createClassroom(classroomData) {
+  const { data } = await classroomApi.create(classroomData)
+  return data
+}
+
+/**
+ * Update a classroom (admin only)
+ */
+export async function updateClassroom(classroomId, classroomData) {
+  const { data } = await classroomApi.update(classroomId, classroomData)
+  return data
+}
+
+/**
+ * Delete a classroom (admin only)
+ */
+export async function deleteClassroom(classroomId) {
+  await classroomApi.delete(classroomId)
+}
+
+/**
+ * Assign subject to classroom (admin only)
+ */
+export async function assignSubjectToClassroom(classSubjectData) {
+  const { data } = await classSubjectApi.create(classSubjectData)
+  return data
+}
+
+/**
+ * Remove subject from classroom (admin only)
+ */
+export async function removeSubjectFromClassroom(classSubjectId) {
+  await classSubjectApi.delete(classSubjectId)
+}
+
+/**
+ * Enroll student in classroom (admin only)
+ */
+export async function enrollStudent(enrollmentData) {
+  const { data } = await enrollmentApi.create(enrollmentData)
+  return data
+}
+
+/**
+ * Remove student from classroom (admin only)
+ */
+export async function removeStudent(enrollmentId) {
+  await enrollmentApi.delete(enrollmentId)
 }

@@ -99,7 +99,7 @@ export default function AdminDashboard() {
           <Link to="/enrollment">
             <Button variant="secondary">Enrollment Queue</Button>
           </Link>
-          <Link to="/classes">
+          <Link to="/classrooms/manage">
             <Button variant="secondary">Manage Classes</Button>
           </Link>
           <Link to="/settings">
@@ -295,7 +295,7 @@ export default function AdminDashboard() {
                   </div>
                 </Link>
 
-                <Link to="/classes" className="rounded-lg border border-gray-200 p-4 hover:bg-gray-50 hover:border-knhs-purple transition-colors">
+                <Link to="/classrooms/manage" className="rounded-lg border border-gray-200 p-4 hover:bg-gray-50 hover:border-knhs-purple transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="rounded-lg bg-green-100 p-3">
                       <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
