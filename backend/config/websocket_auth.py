@@ -1,5 +1,6 @@
 from urllib.parse import parse_qs
 
+from channels.auth import AuthMiddlewareStack
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.contrib.auth.models import AnonymousUser
@@ -23,11 +24,9 @@ class QueryStringJWTAuthMiddleware(BaseMiddleware):
 
         if token:
             scope["user"] = await get_user_from_token(token)
-        else:
-            scope["user"] = AnonymousUser()
 
         return await super().__call__(scope, receive, send)
 
 
 def JWTAuthMiddlewareStack(inner):
-    return QueryStringJWTAuthMiddleware(inner)
+    return QueryStringJWTAuthMiddleware(AuthMiddlewareStack(inner))
