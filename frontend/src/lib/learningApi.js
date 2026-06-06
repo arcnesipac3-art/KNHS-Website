@@ -391,7 +391,7 @@ export const friendshipApi = {
 
   /**
    * Send friend request
-   * @param {Object} data - { recipient }
+   * @param {Object} data - { recipient_id }
    */
   sendRequest: (data) => api.post('/friendships/send_request/', data),
 

@@ -69,7 +69,7 @@ export default function Friends() {
 
   async function handleSendFriendRequest(userId) {
     try {
-      await friendshipApi.sendRequest({ recipient: userId })
+      await friendshipApi.sendRequest({ recipient_id: userId })
       setSearchUsers('')
       setAvailableUsers([])
       alert('Friend request sent!')
