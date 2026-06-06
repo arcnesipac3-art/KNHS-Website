@@ -25,6 +25,7 @@ export default function Messages() {
   const socketRef = useRef(null)
   const reconnectTimeoutRef = useRef(null)
   const subscribedThreadRef = useRef(null)
+  const selectedThreadRef = useRef(null)
 
   useEffect(() => {
     loadThreads()
@@ -35,6 +36,10 @@ export default function Messages() {
       loadMessages(selectedThread.id)
       markThreadRead(selectedThread.id)
     }
+  }, [selectedThread])
+
+  useEffect(() => {
+    selectedThreadRef.current = selectedThread
   }, [selectedThread])
 
   useEffect(() => {
@@ -62,9 +67,14 @@ export default function Messages() {
       socket.onopen = () => {
         if (cancelled) return
         setSocketConnected(true)
-        if (selectedThread?.id) {
-          socket.send(JSON.stringify({ type: 'thread.subscribe', thread_id: selectedThread.id }))
-          subscribedThreadRef.current = selectedThread.id
+        if (selectedThreadRef.current?.id) {
+          socket.send(
+            JSON.stringify({
+              type: 'thread.subscribe',
+              thread_id: selectedThreadRef.current.id,
+            })
+          )
+          subscribedThreadRef.current = selectedThreadRef.current.id
         }
       }
 
@@ -74,7 +84,9 @@ export default function Messages() {
         if (payload.type === 'message.created') {
           if (payload.thread_id === selectedThread?.id) {
             setMessages((prev) => upsertMessage(prev, payload.message))
-            markThreadRead(payload.thread_id, { silent: true })
+            if (payload.message.sender !== user?.id && payload.message.sender_email !== user?.email) {
+              markThreadRead(payload.thread_id, { silent: true })
+            }
           }
           return
         }

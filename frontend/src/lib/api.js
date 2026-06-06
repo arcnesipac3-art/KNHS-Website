@@ -23,6 +23,12 @@ export function getAccessToken() {
   return accessToken
 }
 
+export function getWebSocketBaseUrl() {
+  const url = new URL(API_BASE_URL)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  return url.toString().replace(/\/$/, '')
+}
+
 export function clearAccessToken() {
   accessToken = null
 }
