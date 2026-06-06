@@ -279,6 +279,7 @@ export default function Messages() {
 
   const updateCachedMessages = useCallback((threadId, nextMessages) => {
     const normId = Number(threadId)
+    if (isNaN(normId)) return
     messageCacheRef.current.set(normId, nextMessages)
     if (selectedThreadRef.current?.id && Number(selectedThreadRef.current.id) === normId) {
       setMessages(nextMessages)
@@ -287,6 +288,7 @@ export default function Messages() {
 
   const promoteThreadLocally = useCallback((threadId, message) => {
     const normId = Number(threadId)
+    if (isNaN(normId)) return
     const previewThread = {
       ...selectedThreadRef.current,
       id: normId,
@@ -354,6 +356,7 @@ export default function Messages() {
 
   async function loadMessages(threadId) {
     const normId = Number(threadId)
+    if (isNaN(normId)) return
     const cachedMessages = messageCacheRef.current.get(normId)
     if (cachedMessages) {
       setMessages(cachedMessages)
@@ -384,6 +387,7 @@ export default function Messages() {
 
   async function markThreadRead(threadId, options = {}) {
     const normId = Number(threadId)
+    if (isNaN(normId)) return
     try {
       await api.post(`/message-threads/${normId}/mark_read/`)
       setThreads((prev) =>
@@ -401,11 +405,14 @@ export default function Messages() {
     e.preventDefault()
     if (!newMessage.trim() || !selectedThread) return
 
+    const threadId = selectedThread.id ? Number(selectedThread.id) : null
+    if (!threadId || isNaN(threadId)) return
+
     const content = newMessage.trim()
     const clientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const optimisticMessage = {
       id: clientId,
-      thread: Number(selectedThread.id),
+      thread: threadId,
       sender: user?.id,
       sender_name: user?.display_name || user?.email || 'You',
       sender_email: user?.email,
@@ -417,19 +424,19 @@ export default function Messages() {
 
     setNewMessage('')
     const optimisticMessages = reconcileMessage(
-      messageCacheRef.current.get(Number(selectedThread.id)) || [],
+      messageCacheRef.current.get(threadId) || [],
       optimisticMessage,
       clientId,
       user
     )
-    updateCachedMessages(Number(selectedThread.id), optimisticMessages)
-    promoteThreadLocally(Number(selectedThread.id), optimisticMessage)
+    updateCachedMessages(threadId, optimisticMessages)
+    promoteThreadLocally(threadId, optimisticMessage)
 
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(
         JSON.stringify({
           type: 'message.send',
-          thread_id: Number(selectedThread.id),
+          thread_id: threadId,
           content,
           client_id: clientId,
         })
@@ -440,25 +447,25 @@ export default function Messages() {
     setSending(true)
     try {
       const response = await api.post('/messages/', {
-        thread: Number(selectedThread.id),
+        thread: threadId,
         content,
       })
       const nextMessages = reconcileMessage(
-        messageCacheRef.current.get(Number(selectedThread.id)) || [],
+        messageCacheRef.current.get(threadId) || [],
         response.data,
         clientId,
         user
       )
-      updateCachedMessages(Number(selectedThread.id), nextMessages)
-      promoteThreadLocally(Number(selectedThread.id), response.data)
-      await markThreadRead(Number(selectedThread.id), { silent: true })
+      updateCachedMessages(threadId, nextMessages)
+      promoteThreadLocally(threadId, response.data)
+      await markThreadRead(threadId, { silent: true })
     } catch (error) {
       console.error('Failed to send message:', error)
       const rolledBackMessages = removePendingMessage(
-        messageCacheRef.current.get(Number(selectedThread.id)) || [],
+        messageCacheRef.current.get(threadId) || [],
         clientId
       )
-      updateCachedMessages(Number(selectedThread.id), rolledBackMessages)
+      updateCachedMessages(threadId, rolledBackMessages)
       setNewMessage(content)
       alert('Failed to send message. Please try again.')
     } finally {
@@ -471,6 +478,7 @@ export default function Messages() {
       return
     }
     const normId = Number(threadId)
+    if (isNaN(normId)) return
     try {
       await api.delete(`/message-threads/${normId}/delete_conversation/`)
       messageCacheRef.current.delete(normId)
