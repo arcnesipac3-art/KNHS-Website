@@ -27,3 +27,4 @@ databases:
     type: redis
     plan: free
     region: singapore
+# deploy trigger
