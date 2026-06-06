@@ -26,7 +26,7 @@ beforeEach(() => {
 })
 
 // Mock PortalLayout to simplify component tests
-vi.mock('@/components/layout/PortalLayout', () => ({
+vi.mock('../components/layout/PortalLayout', () => ({
   __esModule: true,
   default: ({ children, title }) => React.createElement(
     'div', 
