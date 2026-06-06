@@ -14,6 +14,12 @@ export default function Messages() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [showNewConversation, setShowNewConversation] = useState(false)
+  const [searchUsers, setSearchUsers] = useState('')
+  const [availableUsers, setAvailableUsers] = useState([])
+  const [selectedParticipants, setSelectedParticipants] = useState([])
+  const [subject, setSubject] = useState('')
+  const [initialMessage, setInitialMessage] = useState('')
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const messagesEndRef = useRef(null)
 
   useEffect(() => {

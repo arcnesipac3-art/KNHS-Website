@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote, AnnouncementLike, AnnouncementComment
 
 
 class AnnouncementAttachmentSerializer(serializers.ModelSerializer):
@@ -11,14 +11,29 @@ class AnnouncementAttachmentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
+class AnnouncementCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source="user.display_name", read_only=True)
+    author_avatar = serializers.CharField(source="user.profile.avatar_url", read_only=True)
+
+    class Meta:
+        model = AnnouncementComment
+        fields = ["id", "author_name", "author_avatar", "content", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
 class AnnouncementSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source="author.display_name", read_only=True)
+    author_avatar = serializers.CharField(source="author.profile.avatar_url", read_only=True)
     audience_type_display = serializers.CharField(source="get_audience_type_display", read_only=True)
     priority_display = serializers.CharField(source="get_priority_display", read_only=True)
     attachments = AnnouncementAttachmentSerializer(many=True, read_only=True)
     is_published = serializers.BooleanField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_read = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    likes_count = serializers.IntegerField(source="likes.count", read_only=True)
+    comments_count = serializers.IntegerField(source="comments.count", read_only=True)
+    comments = AnnouncementCommentSerializer(many=True, read_only=True)
     audience_ref_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -27,6 +42,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             "id",
             "author",
             "author_name",
+            "author_avatar",
             "title",
             "body",
             "priority",
@@ -41,6 +57,10 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             "is_published",
             "is_expired",
             "is_read",
+            "is_liked",
+            "likes_count",
+            "comments_count",
+            "comments",
             "attachments",
             "created_at",
             "updated_at",
@@ -52,6 +72,15 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return AnnouncementRead.objects.filter(
+                announcement=obj, user=request.user
+            ).exists()
+        return False
+
+    def get_is_liked(self, obj):
+        """Check if current user has liked this announcement."""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return AnnouncementLike.objects.filter(
                 announcement=obj, user=request.user
             ).exists()
         return False

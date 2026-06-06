@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.academics.permissions import IsAdminUser
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote, AnnouncementLike, AnnouncementComment
 from .serializers import (
     AnnouncementSerializer,
     AnnouncementAttachmentSerializer,
@@ -22,13 +22,14 @@ from .serializers import (
     CounselingCaseSerializer,
     CreateCounselingCaseSerializer,
     CounselingNoteSerializer,
+    AnnouncementCommentSerializer,
 )
 
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
     """Announcement management."""
 
-    queryset = Announcement.objects.select_related("author").prefetch_related("attachments").all()
+    queryset = Announcement.objects.select_related("author", "author__profile").prefetch_related("attachments", "likes", "comments", "comments__user", "comments__user__profile").all()
     serializer_class = AnnouncementSerializer
     permission_classes = [IsAuthenticated]
 
@@ -174,6 +175,39 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             Notification.objects.bulk_create(notifications)
 
         return Response({"message": "Announcement published successfully"})
+
+    @action(detail=True, methods=["post"])
+    def like(self, request, pk=None):
+        """Like an announcement."""
+        announcement = self.get_object()
+        like, created = AnnouncementLike.objects.get_or_create(
+            announcement=announcement, user=request.user
+        )
+        return Response({"message": "Liked", "created": created})
+
+    @action(detail=True, methods=["post"])
+    def unlike(self, request, pk=None):
+        """Unlike an announcement."""
+        announcement = self.get_object()
+        AnnouncementLike.objects.filter(
+            announcement=announcement, user=request.user
+        ).delete()
+        return Response({"message": "Unliked"})
+
+    @action(detail=True, methods=["post"])
+    def comment(self, request, pk=None):
+        """Add a comment to an announcement."""
+        announcement = self.get_object()
+        content = request.data.get("content")
+        if not content:
+            return Response({"error": "Content is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        comment = AnnouncementComment.objects.create(
+            announcement=announcement,
+            user=request.user,
+            content=content
+        )
+        return Response(AnnouncementCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):

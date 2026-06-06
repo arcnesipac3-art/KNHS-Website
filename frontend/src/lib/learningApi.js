@@ -325,6 +325,21 @@ export const announcementApi = {
    * Get unread announcements
    */
   getUnread: () => api.get('/announcements/unread/'),
+
+  /**
+   * Like an announcement
+   */
+  like: (id) => api.post(`/announcements/${id}/like/`),
+
+  /**
+   * Unlike an announcement
+   */
+  unlike: (id) => api.post(`/announcements/${id}/unlike/`),
+
+  /**
+   * Add a comment to an announcement
+   */
+  comment: (id, content) => api.post(`/announcements/${id}/comment/`, { content }),
 }
 
 // ============================================================================

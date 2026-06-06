@@ -101,19 +101,50 @@ class AnnouncementRead(models.Model):
     announcement = models.ForeignKey(
         Announcement, on_delete=models.CASCADE, related_name="reads"
     )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="announcement_reads"
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     read_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [["announcement", "user"]]
-        indexes = [
-            models.Index(fields=["user", "read_at"]),
-        ]
+        unique_together = ["announcement", "user"]
 
     def __str__(self):
-        return f"{self.user.display_name} read {self.announcement.title}"
+        return f"{self.user.email} read {self.announcement.title}"
+
+
+class AnnouncementLike(models.Model):
+    """Likes for announcements."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    announcement = models.ForeignKey(
+        Announcement, on_delete=models.CASCADE, related_name="likes"
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["announcement", "user"]
+
+    def __str__(self):
+        return f"{self.user.email} liked {self.announcement.title}"
+
+
+class AnnouncementComment(models.Model):
+    """Comments for announcements."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    announcement = models.ForeignKey(
+        Announcement, on_delete=models.CASCADE, related_name="comments"
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Comment by {self.user.email} on {self.announcement.title}"
 
 
 class Notification(models.Model):
