@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../features/auth/AuthContext'
+import { useLocation } from 'react-router-dom'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -7,6 +8,7 @@ import api, { getAccessToken, getWebSocketBaseUrl } from '../lib/api'
 
 export default function Messages() {
   const { user } = useAuth()
+  const location = useLocation()
   const [threads, setThreads] = useState([])
   const [selectedThread, setSelectedThread] = useState(null)
   const [messages, setMessages] = useState([])
@@ -20,6 +22,8 @@ export default function Messages() {
   const [subject, setSubject] = useState('')
   const [initialMessage, setInitialMessage] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [friends, setFriends] = useState([])
+  const [loadingFriends, setLoadingFriends] = useState(false)
   const [socketConnected, setSocketConnected] = useState(false)
   const messagesEndRef = useRef(null)
   const socketRef = useRef(null)
@@ -30,6 +34,17 @@ export default function Messages() {
   useEffect(() => {
     loadThreads()
   }, [])
+
+  useEffect(() => {
+    // Handle navigation from Friends page with selectedThreadId
+    if (location.state?.selectedThreadId && threads.length > 0) {
+      const threadId = location.state.selectedThreadId
+      const thread = threads.find(t => t.id === threadId)
+      if (thread) {
+        setSelectedThread(thread)
+      }
+    }
+  }, [location.state?.selectedThreadId, threads])
 
   useEffect(() => {
     if (selectedThread) {
@@ -51,6 +66,12 @@ export default function Messages() {
       loadAvailableUsers()
     }
   }, [showNewConversation, searchUsers])
+
+  useEffect(() => {
+    if (showNewConversation) {
+      loadFriends()
+    }
+  }, [showNewConversation])
 
   useEffect(() => {
     const token = getAccessToken()
@@ -157,6 +178,24 @@ export default function Messages() {
       console.error('Failed to load users:', error)
     } finally {
       setLoadingUsers(false)
+    }
+  }
+
+  async function loadFriends() {
+    setLoadingFriends(true)
+    try {
+      const response = await api.get('/friendships/my_friends/')
+      const friendsList = response.data || []
+      // Filter out already selected participants
+      const filtered = friendsList.filter(f => 
+        !selectedParticipants.find(p => p.id === f.id)
+      )
+      setFriends(filtered)
+    } catch (error) {
+      console.error('Failed to load friends:', error)
+      setFriends([])
+    } finally {
+      setLoadingFriends(false)
     }
   }
 
@@ -379,6 +418,31 @@ export default function Messages() {
                     </div>
                   ))}
                 </div>
+                
+                {/* Friend Suggestions */}
+                {!searchUsers && friends.length > 0 && (
+                  <div className="mb-3">
+                    <p className="mb-2 text-xs font-medium text-muted">Suggested Friends</p>
+                    <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-200 bg-white">
+                      {friends.slice(0, 5).map(friend => (
+                        <div
+                          key={friend.id}
+                          onClick={() => handleAddParticipant(friend)}
+                          className="flex cursor-pointer items-center gap-3 p-2 hover:bg-gray-50"
+                        >
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColor(friend.display_name || friend.email)}`}>
+                            {getAvatar(friend.display_name || friend.email)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-text">{friend.display_name || friend.email}</p>
+                            <p className="text-xs text-muted">{friend.role}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative">
                   <input
                     type="text"
@@ -474,10 +538,11 @@ export default function Messages() {
                 </div>
               ) : threads.length === 0 ? (
                 <div className="p-8 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="mx-auto h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                  <p className="mt-2 text-sm text-muted">No conversations yet</p>
+                  <p className="mt-4 text-sm text-muted">No conversations yet</p>
+                  <p className="mt-1 text-xs text-muted">Click "New Message" to start a conversation</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">

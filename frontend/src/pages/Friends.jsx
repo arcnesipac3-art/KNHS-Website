@@ -5,15 +5,18 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { friendshipApi } from '../lib/learningApi'
 import api from '../lib/api'
+import { useNavigate } from 'react-router-dom'
 
 export default function Friends() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [friends, setFriends] = useState([])
   const [pendingRequests, setPendingRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchUsers, setSearchUsers] = useState('')
   const [availableUsers, setAvailableUsers] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [startingConversation, setStartingConversation] = useState(false)
 
   useEffect(() => {
     loadFriends()
@@ -110,6 +113,22 @@ export default function Friends() {
     }
   }
 
+  async function handleStartConversation(friendId) {
+    setStartingConversation(true)
+    try {
+      const response = await api.post('/message-threads/start_conversation/', {
+        participant_ids: [friendId],
+        initial_message: '',
+      })
+      navigate(`/messages`, { state: { selectedThreadId: response.data.id } })
+    } catch (error) {
+      console.error('Failed to start conversation:', error)
+      alert('Failed to start conversation. Please try again.')
+    } finally {
+      setStartingConversation(false)
+    }
+  }
+
   function getAvatar(name) {
     return name ? name.charAt(0).toUpperCase() : '?'
   }
@@ -187,7 +206,13 @@ export default function Friends() {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-knhs-purple border-t-transparent"></div>
               </div>
             ) : friends.length === 0 ? (
-              <p className="text-muted">No friends yet. Add some friends to get started!</p>
+              <div className="py-8 text-center">
+                <svg className="mx-auto h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <p className="mt-4 text-sm text-muted">No friends yet</p>
+                <p className="mt-1 text-xs text-muted">Search for people above to add friends</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {friends.map(friend => (
@@ -205,8 +230,13 @@ export default function Friends() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => window.location.href = `/messages`}>
-                        Message
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        onClick={() => handleStartConversation(friend.id)}
+                        disabled={startingConversation}
+                      >
+                        {startingConversation ? 'Starting...' : 'Message'}
                       </Button>
                       <Button
                         size="sm"
@@ -229,7 +259,13 @@ export default function Friends() {
               Pending Requests ({pendingRequests.length})
             </h2>
             {pendingRequests.length === 0 ? (
-              <p className="text-muted">No pending friend requests</p>
+              <div className="py-8 text-center">
+                <svg className="mx-auto h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                <p className="mt-4 text-sm text-muted">No pending friend requests</p>
+                <p className="mt-1 text-xs text-muted">When people send you requests, they'll appear here</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {pendingRequests.map(request => (
