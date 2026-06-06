@@ -4,27 +4,16 @@ import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { useTeacherDashboard, useCurrentAcademicYear, useStudentAlerts, useTodaySchedule, useRecentAnnouncements } from '../hooks/useDashboard'
-import DashboardSkeleton from '../components/ui/DashboardSkeleton'
 
 export default function TeacherDashboard() {
   const { user } = useAuth()
 
   // Fetch data with TanStack Query
-  const { data: dashboard, isLoading: dashboardLoading } = useTeacherDashboard()
-  const { data: academicYear, isLoading: yearLoading } = useCurrentAcademicYear()
-  const { data: studentAlerts = [], isLoading: alertsLoading } = useStudentAlerts()
-  const { data: announcements = [], isLoading: announcementsLoading } = useRecentAnnouncements(5)
-  const { data: todaySchedule = [], isLoading: scheduleLoading } = useTodaySchedule()
-
-  const isLoading = dashboardLoading || yearLoading || alertsLoading || announcementsLoading || scheduleLoading
-
-  if (isLoading) {
-    return (
-      <PortalLayout>
-        <DashboardSkeleton />
-      </PortalLayout>
-    )
-  }
+  const { data: dashboard } = useTeacherDashboard()
+  const { data: academicYear } = useCurrentAcademicYear()
+  const { data: studentAlerts = [] } = useStudentAlerts()
+  const { data: announcements = [] } = useRecentAnnouncements(5)
+  const { data: todaySchedule = [] } = useTodaySchedule()
 
   // Safely access quarters - it's at the top level of the response
   const quarters = Array.isArray(academicYear?.quarters) ? academicYear.quarters : []

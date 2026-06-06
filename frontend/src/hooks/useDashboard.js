@@ -39,7 +39,7 @@ export function useAdminDashboard() {
   return useQuery({
     queryKey: queryKeys.dashboard.admin(),
     queryFn: async () => {
-      const { data } = await api.get('/dashboard/admin/')
+      const { data } = await api.get('/dashboard/')
       return data
     },
     staleTime: staleTime.dashboard,
@@ -53,7 +53,7 @@ export function usePrincipalDashboard() {
   return useQuery({
     queryKey: queryKeys.dashboard.principal(),
     queryFn: async () => {
-      const { data } = await api.get('/dashboard/principal/')
+      const { data } = await api.get('/dashboard/')
       return data
     },
     staleTime: staleTime.dashboard,
@@ -67,7 +67,7 @@ export function useGuidanceDashboard() {
   return useQuery({
     queryKey: queryKeys.dashboard.guidance(),
     queryFn: async () => {
-      const { data } = await api.get('/dashboard/guidance/')
+      const { data } = await api.get('/dashboard/')
       return data
     },
     staleTime: staleTime.dashboard,
@@ -81,7 +81,7 @@ export function useRegistrarDashboard() {
   return useQuery({
     queryKey: queryKeys.dashboard.registrar(),
     queryFn: async () => {
-      const { data } = await api.get('/dashboard/registrar/')
+      const { data } = await api.get('/dashboard/')
       return data
     },
     staleTime: staleTime.dashboard,
@@ -95,7 +95,7 @@ export function useParentDashboard() {
   return useQuery({
     queryKey: queryKeys.dashboard.parent(),
     queryFn: async () => {
-      const { data } = await api.get('/dashboard/parent/')
+      const { data } = await api.get('/dashboard/')
       return data
     },
     staleTime: staleTime.dashboard,

@@ -4,25 +4,14 @@ import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { useStudentDashboard, useCurrentAcademicYear, useAttendanceSummary } from '../hooks/useDashboard'
-import DashboardSkeleton from '../components/ui/DashboardSkeleton'
 
 export default function StudentDashboard() {
   const { user } = useAuth()
 
   // Fetch data with TanStack Query
-  const { data: dashboard, isLoading: dashboardLoading } = useStudentDashboard()
-  const { data: academicYear, isLoading: yearLoading } = useCurrentAcademicYear()
-  const { data: attendance, isLoading: attendanceLoading } = useAttendanceSummary()
-
-  const isLoading = dashboardLoading || yearLoading || attendanceLoading
-
-  if (isLoading) {
-    return (
-      <PortalLayout>
-        <DashboardSkeleton />
-      </PortalLayout>
-    )
-  }
+  const { data: dashboard } = useStudentDashboard()
+  const { data: academicYear } = useCurrentAcademicYear()
+  const { data: attendance } = useAttendanceSummary()
 
   // Safely access quarters - it's at the top level of the response
   const quarters = Array.isArray(academicYear?.quarters) ? academicYear.quarters : []

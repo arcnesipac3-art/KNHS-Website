@@ -6,7 +6,6 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { announcementApi } from '../lib/learningApi'
 import { useAnnouncements, useUnreadAnnouncements, useLikeAnnouncement, useUnlikeAnnouncement, useCommentAnnouncement, useMarkAnnouncementRead, useDeleteAnnouncement } from '../hooks/useAnnouncements'
-import AnnouncementSkeleton from '../components/ui/AnnouncementSkeleton'
 
 export default function AnnouncementList() {
   const { user } = useAuth()
@@ -115,9 +114,7 @@ export default function AnnouncementList() {
         </div>
 
         {/* Announcements List */}
-        {isLoading ? (
-          <AnnouncementSkeleton count={3} />
-        ) : announcements.length === 0 ? (
+        {announcements.length === 0 && !isLoading ? (
           <div className="py-20 text-center space-y-4">
             <div className="text-5xl">📢</div>
             <h3 className="text-xl font-bold text-text">No posts yet</h3>

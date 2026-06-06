@@ -5,7 +5,6 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { userApi } from '../lib/userApi'
 import { useUsers, useDeleteUser, useToggleUserActive, useResetUserPassword, useCreateUser, useUpdateUser } from '../hooks/useUsers'
-import UserListSkeleton from '../components/ui/UserListSkeleton'
 
 // Generate a secure temporary password
 function generateTempPassword() {
@@ -200,9 +199,7 @@ export default function UserManagement() {
 
         {/* User Table */}
         <Card title={`Users (${users.length})`}>
-          {isLoading ? (
-            <UserListSkeleton count={10} />
-          ) : users.length === 0 ? (
+          {users.length === 0 && !isLoading ? (
             <div className="py-12 text-center text-muted">No users found.</div>
           ) : (
             <div className="overflow-x-auto">
