@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote, AnnouncementLike, AnnouncementComment
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote, AnnouncementLike, AnnouncementComment, Friendship
 
 
 class AnnouncementAttachmentSerializer(serializers.ModelSerializer):

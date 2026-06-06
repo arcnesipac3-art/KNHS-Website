@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification
+from .models import (
+    Announcement, AnnouncementAttachment, AnnouncementRead, Notification,
+    AnnouncementLike, AnnouncementComment, MessageThread, Message,
+    CounselingCase, CounselingNote, Friendship
+)
 
 
 class AnnouncementAttachmentInline(admin.TabularInline):
@@ -52,3 +56,28 @@ class NotificationAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at"]
     ordering = ["-created_at"]
     date_hierarchy = "created_at"
+
+
+@admin.register(AnnouncementLike)
+class AnnouncementLikeAdmin(admin.ModelAdmin):
+    list_display = ["user", "announcement", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["user__email", "announcement__title"]
+    readonly_fields = ["created_at"]
+
+
+@admin.register(AnnouncementComment)
+class AnnouncementCommentAdmin(admin.ModelAdmin):
+    list_display = ["user", "announcement", "content", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["user__email", "announcement__title", "content"]
+    readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(Friendship)
+class FriendshipAdmin(admin.ModelAdmin):
+    list_display = ["requester", "recipient", "status", "created_at", "updated_at"]
+    list_filter = ["status", "created_at"]
+    search_fields = ["requester__email", "recipient__email"]
+    readonly_fields = ["created_at", "updated_at"]
+    ordering = ["-created_at"]

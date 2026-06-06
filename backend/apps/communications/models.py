@@ -372,3 +372,46 @@ class CounselingNote(models.Model):
 
     def __str__(self):
         return f"Note for {self.case.title} by {self.author.display_name if self.author else 'Unknown'}"
+
+
+class Friendship(models.Model):
+    """Friend relationships between users."""
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("blocked", "Blocked"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_friend_requests"
+    )
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_friend_requests"
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ["requester", "recipient"]
+        indexes = [
+            models.Index(fields=["requester", "status"]),
+            models.Index(fields=["recipient", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.requester.display_name} → {self.recipient.display_name} ({self.get_status_display()})"
+
+    @property
+    def is_accepted(self):
+        return self.status == "accepted"
+
+    @property
+    def is_pending(self):
+        return self.status == "pending"
