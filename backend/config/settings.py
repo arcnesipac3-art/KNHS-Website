@@ -335,7 +335,7 @@ POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://app.posthog.com")
 POSTHOG_ENABLED = bool(POSTHOG_PROJECT_ID) and not DEBUG
 
 # ── Sentry Error Tracking ───────────────────────────────────────────────────
-SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+SENTRY_DSN = os.getenv("SENTRY_DSN", "https://7b7c9f503ba019e228dcb455306de390@o4511519493193728.ingest.us.sentry.io/4511519565414400")
 SENTRY_ENABLED = bool(SENTRY_DSN) and not DEBUG
 
 if SENTRY_ENABLED:
@@ -348,5 +348,5 @@ if SENTRY_ENABLED:
         traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
         profiles_sample_rate=0.1,  # 10% of profiles for performance monitoring
         environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
-        send_default_pii=False,  # Don't send personally identifiable information
+        send_default_pii=True,  # Send request headers and IP for users
     )
