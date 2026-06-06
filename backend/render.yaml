@@ -16,3 +16,14 @@ services:
         value: False
       - key: RENDER
         value: true
+      - key: CHANNEL_REDIS_URL
+        fromService:
+          type: redis
+          name: knhs-redis
+          property: connectionString
+
+databases:
+  - name: knhs-redis
+    type: redis
+    plan: free
+    region: singapore
