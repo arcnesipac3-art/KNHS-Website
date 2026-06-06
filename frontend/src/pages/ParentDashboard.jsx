@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
@@ -13,9 +14,11 @@ export default function ParentDashboard() {
   const [childGrades, setChildGrades] = useState([])
   const [childAttendance, setChildAttendance] = useState([])
   const [showLinkForm, setShowLinkForm] = useState(false)
+  const [announcements, setAnnouncements] = useState([])
 
   useEffect(() => {
     loadChildren()
+    loadAnnouncements()
   }, [])
 
   useEffect(() => {
@@ -24,6 +27,15 @@ export default function ParentDashboard() {
       loadChildAttendance(selectedChild.student)
     }
   }, [selectedChild])
+
+  async function loadAnnouncements() {
+    try {
+      const response = await api.get('/announcements/?limit=5')
+      setAnnouncements(response.data.results || response.data || [])
+    } catch (error) {
+      console.error('Failed to load announcements:', error)
+    }
+  }
 
   async function loadChildren() {
     try {
@@ -91,11 +103,34 @@ export default function ParentDashboard() {
 
   return (
     <PortalLayout>
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-text">Parent Dashboard</h1>
-          <p className="mt-2 text-muted">Monitor your child's academic progress</p>
+      <div className="mx-auto max-w-6xl space-y-8">
+        {/* Welcome Banner */}
+        <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-800 p-6 text-white shadow-lg">
+          <p className="text-sm opacity-90">Welcome back,</p>
+          <h1 className="text-3xl font-bold">{user?.display_name || user?.email}</h1>
+          <p className="mt-1 text-blue-100">Parent Portal • Monitor your child's progress</p>
+          <p className="mt-2 text-sm text-blue-200">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
         </div>
+
+        {/* Quick Actions */}
+        {children.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            <Link to="/grades">
+              <Button>View Grades</Button>
+            </Link>
+            <Link to="/attendance">
+              <Button variant="secondary">Check Attendance</Button>
+            </Link>
+            <Link to="/announcements">
+              <Button variant="secondary">Announcements</Button>
+            </Link>
+            <Link to="/messages">
+              <Button variant="secondary">Contact School</Button>
+            </Link>
+          </div>
+        )}
 
         {children.length === 0 ? (
           <Card>
@@ -171,7 +206,7 @@ export default function ParentDashboard() {
                 </Card>
 
                 {/* Child Attendance */}
-                <Card>
+                <Card className="mb-6">
                   <h2 className="mb-4 text-lg font-semibold text-text">Attendance Summary</h2>
                   {childAttendance.length === 0 ? (
                     <p className="text-muted">No attendance records available</p>
@@ -212,6 +247,35 @@ export default function ParentDashboard() {
                         </tbody>
                       </table>
                     </div>
+                  )}
+                </Card>
+
+                {/* Recent Announcements */}
+                <Card>
+                  <h2 className="mb-4 text-lg font-semibold text-text">Recent Announcements</h2>
+                  {announcements?.length > 0 ? (
+                    <div className="space-y-3">
+                      {announcements.map((announcement) => (
+                        <div
+                          key={announcement.id}
+                          className="rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
+                        >
+                          <h5 className="text-sm font-medium text-text">{announcement.title}</h5>
+                          <p className="mt-1 text-xs text-muted line-clamp-2">{announcement.content || announcement.body}</p>
+                          <p className="mt-1 text-xs text-muted">
+                            {new Date(announcement.created_at || announcement.published_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))}
+                      <Link
+                        to="/announcements"
+                        className="block text-center text-sm text-blue-600 hover:underline"
+                      >
+                        View all →
+                      </Link>
+                    </div>
+                  ) : (
+                    <p className="py-4 text-center text-sm text-muted">No recent announcements</p>
                   )}
                 </Card>
               </>
