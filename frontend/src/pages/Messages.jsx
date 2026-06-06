@@ -64,6 +64,29 @@ export default function Messages() {
     selectedThreadRef.current = selectedThread
   }, [selectedThread])
 
+  // Polling fallback: silently refresh messages every 10s in case a WebSocket event was missed
+  useEffect(() => {
+    if (!selectedThread?.id) return
+    const threadId = selectedThread.id
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await api.get(`/messages/?thread=${threadId}`)
+        const fresh = dedupeMessages(response.data.results || response.data)
+        const cached = messageCacheRef.current.get(threadId) || []
+        // Only update if the server has more messages than our cache
+        if (fresh.length > cached.length || (fresh.length > 0 && cached.length > 0 && fresh[fresh.length - 1]?.id !== cached[cached.length - 1]?.id)) {
+          messageCacheRef.current.set(threadId, fresh)
+          if (selectedThreadRef.current?.id === threadId) {
+            setMessages(fresh)
+          }
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    }, 10000)
+    return () => clearInterval(intervalId)
+  }, [selectedThread?.id])
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
@@ -156,10 +179,20 @@ export default function Messages() {
           return
         }
 
+        // Server signals connection is ready — subscribe to current thread if one is selected
+        if (payload.type === 'connection.ready') {
+          if (selectedThreadRef.current?.id) {
+            const currentId = selectedThreadRef.current.id
+            socket.send(JSON.stringify({ type: 'thread.subscribe', thread_id: currentId }))
+            subscribedThreadRef.current = currentId
+          }
+          return
+        }
+
         if (payload.type === 'message.created') {
-          const payloadThreadId = payload.thread_id
-          const currentThreadId = selectedThreadRef.current?.id
-          
+          const payloadThreadId = String(payload.thread_id)
+          const currentThreadId = String(selectedThreadRef.current?.id || '')
+
           if (payloadThreadId && payloadThreadId === currentThreadId) {
             const nextMessages = reconcileMessage(
               messageCacheRef.current.get(payloadThreadId) || [],
@@ -169,9 +202,13 @@ export default function Messages() {
             )
             messageCacheRef.current.set(payloadThreadId, nextMessages)
             setMessages(nextMessages)
-            if (payload.message.sender !== user?.id && payload.message.sender_email !== user?.email) {
+            // Mark as read only if the message is from someone else
+            if (String(payload.message.sender) !== String(user?.id) && payload.message.sender_email !== user?.email) {
               markThreadRead(payloadThreadId, { silent: true })
             }
+          } else if (payloadThreadId) {
+            // Message arrived for a thread we're not viewing — invalidate its cache so it reloads fresh
+            messageCacheRef.current.delete(payloadThreadId)
           }
           return
         }
@@ -246,24 +283,22 @@ export default function Messages() {
   }, [user?.id])
 
   useEffect(() => {
-    const socket = socketRef.current
-    if (!socket || socket.readyState !== WebSocket.OPEN) return
-
     const selectedId = selectedThread?.id
     const subscribedId = subscribedThreadRef.current
 
+    // Unsubscribe from previous thread
     if (subscribedId && subscribedId !== selectedId) {
-      socket.send(
-        JSON.stringify({
-          type: 'thread.unsubscribe',
-          thread_id: subscribedId,
-        })
-      )
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.send(
+          JSON.stringify({ type: 'thread.unsubscribe', thread_id: subscribedId })
+        )
+      }
       subscribedThreadRef.current = null
     }
 
-    if (selectedId) {
-      socket.send(JSON.stringify({ type: 'thread.subscribe', thread_id: selectedId }))
+    // Subscribe to new thread (even if socket isn't open yet — onopen & connection.ready handle that case)
+    if (selectedId && socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'thread.subscribe', thread_id: selectedId }))
       subscribedThreadRef.current = selectedId
     }
   }, [selectedThread?.id])
