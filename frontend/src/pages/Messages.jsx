@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useAuth } from '../features/auth/AuthContext'
 import { useLocation } from 'react-router-dom'
 import PortalLayout from '../components/layout/PortalLayout'
@@ -25,11 +25,13 @@ export default function Messages() {
   const [friends, setFriends] = useState([])
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [socketConnected, setSocketConnected] = useState(false)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const messagesEndRef = useRef(null)
   const socketRef = useRef(null)
   const reconnectTimeoutRef = useRef(null)
   const subscribedThreadRef = useRef(null)
   const selectedThreadRef = useRef(null)
+  const debounceTimeoutRef = useRef(null)
 
   useEffect(() => {
     loadThreads()
@@ -62,16 +64,31 @@ export default function Messages() {
   }, [messages])
 
   useEffect(() => {
-    if (showNewConversation && searchUsers.length >= 2) {
-      loadAvailableUsers()
-    }
-  }, [showNewConversation, searchUsers])
-
-  useEffect(() => {
     if (showNewConversation) {
       loadFriends()
     }
-  }, [showNewConversation])
+  }, [showNewConversation, loadFriends])
+
+  useEffect(() => {
+    // Debounce search input to reduce API calls
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchUsers)
+    }, 300)
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [searchUsers])
+
+  useEffect(() => {
+    if (showNewConversation && debouncedSearch.length >= 2) {
+      loadAvailableUsers()
+    }
+  }, [showNewConversation, debouncedSearch, loadAvailableUsers])
 
   useEffect(() => {
     const token = getAccessToken()
@@ -100,10 +117,11 @@ export default function Messages() {
       }
 
       socket.onmessage = (event) => {
+        if (cancelled) return
         const payload = JSON.parse(event.data)
 
         if (payload.type === 'message.created') {
-          if (payload.thread_id === selectedThread?.id) {
+          if (payload.thread_id === selectedThreadRef.current?.id) {
             setMessages((prev) => upsertMessage(prev, payload.message))
             if (payload.message.sender !== user?.id && payload.message.sender_email !== user?.email) {
               markThreadRead(payload.thread_id, { silent: true })
@@ -121,7 +139,10 @@ export default function Messages() {
       socket.onclose = () => {
         if (cancelled) return
         setSocketConnected(false)
-        reconnectTimeoutRef.current = window.setTimeout(connect, 2000)
+        // Only reconnect if not intentionally closed
+        if (!cancelled) {
+          reconnectTimeoutRef.current = window.setTimeout(connect, 2000)
+        }
       }
     }
 
@@ -160,14 +181,14 @@ export default function Messages() {
     }
   }, [selectedThread?.id])
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  }, [])
 
-  async function loadAvailableUsers() {
+  const loadAvailableUsers = useCallback(async () => {
     setLoadingUsers(true)
     try {
-      const response = await api.get('/users/', { params: { search: searchUsers } })
+      const response = await api.get('/users/', { params: { search: debouncedSearch } })
       const users = Array.isArray(response.data) ? response.data : (response.data?.results ?? [])
       // Filter out current user and already selected participants
       const filtered = users.filter(u => 
@@ -179,9 +200,9 @@ export default function Messages() {
     } finally {
       setLoadingUsers(false)
     }
-  }
+  }, [debouncedSearch, selectedParticipants, user?.id])
 
-  async function loadFriends() {
+  const loadFriends = useCallback(async () => {
     setLoadingFriends(true)
     try {
       const response = await api.get('/friendships/my_friends/')
@@ -197,7 +218,7 @@ export default function Messages() {
     } finally {
       setLoadingFriends(false)
     }
-  }
+  }, [selectedParticipants])
 
   async function loadThreads() {
     try {
@@ -301,30 +322,30 @@ export default function Messages() {
     }
   }
 
-  function handleAddParticipant(user) {
+  const handleAddParticipant = useCallback((user) => {
     setSelectedParticipants([...selectedParticipants, user])
     setAvailableUsers(availableUsers.filter(u => u.id !== user.id))
     setSearchUsers('')
-  }
+  }, [selectedParticipants, availableUsers])
 
-  function handleRemoveParticipant(userId) {
+  const handleRemoveParticipant = useCallback((userId) => {
     setSelectedParticipants(selectedParticipants.filter(p => p.id !== userId))
-  }
+  }, [selectedParticipants])
 
-  function getAvatar(name) {
+  const getAvatar = useCallback((name) => {
     return name ? name.charAt(0).toUpperCase() : '?'
-  }
+  }, [])
 
-  function getAvatarColor(name) {
+  const getAvatarColor = useCallback((name) => {
     const colors = [
       'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500',
       'bg-indigo-500', 'bg-teal-500', 'bg-orange-500', 'bg-red-500'
     ]
     const index = name ? name.charCodeAt(0) % colors.length : 0
     return colors[index]
-  }
+  }, [])
 
-  function formatTime(dateString) {
+  const formatTime = useCallback((dateString) => {
     const date = new Date(dateString)
     const now = new Date()
     const diffMs = now - date
@@ -337,18 +358,21 @@ export default function Messages() {
     if (diffHours < 24) return `${diffHours}h`
     if (diffDays < 7) return `${diffDays}d`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
+  }, [])
 
-  function formatMessageTime(dateString) {
+  const formatMessageTime = useCallback((dateString) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  }
+  }, [])
 
   const selectedThreadTitle = useMemo(() => {
     if (!selectedThread) return ''
     const otherParticipants = selectedThread.participants_detail.filter((p) => !p.is_current_user)
     return selectedThread.subject || otherParticipants.map((p) => p.name).join(', ')
   }, [selectedThread])
+
+  const memoizedThreads = useMemo(() => threads, [threads])
+  const memoizedMessages = useMemo(() => messages, [messages])
 
   return (
     <PortalLayout>
@@ -546,7 +570,7 @@ export default function Messages() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {threads.map(thread => {
+                  {memoizedThreads.map(thread => {
                     const otherParticipants = thread.participants_detail.filter(p => !p.is_current_user)
                     const displayName = otherParticipants.map(p => p.name).join(', ') || 'Unknown'
                     const lastMessage = thread.last_message
@@ -622,7 +646,7 @@ export default function Messages() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {messages.map(message => {
+                      {memoizedMessages.map(message => {
                         const isOwn = message.sender === user?.id || message.sender_email === user?.email
                         return (
                           <div
