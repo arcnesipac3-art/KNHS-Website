@@ -12,9 +12,10 @@ export default function NotificationPanel() {
   // Load unread count on mount
   useEffect(() => {
     loadUnreadCount()
-    // Poll every 30 seconds
-    const interval = setInterval(loadUnreadCount, 30000)
-    return () => clearInterval(interval)
+    // Disabled polling to prevent 429 rate limiting errors
+    // Uncomment below to re-enable polling if needed
+    // const interval = setInterval(loadUnreadCount, 30000)
+    // return () => clearInterval(interval)
   }, [])
 
   // Load notifications when panel opens

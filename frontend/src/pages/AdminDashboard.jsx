@@ -17,33 +17,36 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     async function loadDashboard() {
-      const [yearResult, dashboardResult, activitiesResult] = await Promise.allSettled([
-        getCurrentAcademicYearWithQuarters(),
-        api.get('/dashboard/'),
-        api.get('/audit-logs/?limit=10'),
-      ])
-
-      if (yearResult.status === 'fulfilled') {
-        setAcademicYear(yearResult.value)
-      } else {
+      // Load calls sequentially to avoid rate limiting
+      let yearResult, dashboardResult, activitiesResult
+      
+      try {
+        yearResult = await getCurrentAcademicYearWithQuarters()
+        setAcademicYear(yearResult)
+      } catch {
         setAcademicYear({ academicYear: null, quarters: [] })
       }
 
-      if (dashboardResult.status === 'fulfilled') {
-        const d = dashboardResult.value.data
+      try {
+        const d = await api.get('/dashboard/')
+        dashboardResult = d.data
         setStats({
-          total_students: d?.users?.active_students ?? 0,
-          total_teachers: d?.users?.active_teachers ?? 0,
+          total_students: d?.data?.users?.active_students ?? 0,
+          total_teachers: d?.data?.users?.active_teachers ?? 0,
           total_classrooms: 0,
-          pending_enrollments: d?.grades?.pending_approvals ?? 0,
-          total_users: (d?.users?.active_students ?? 0) + (d?.users?.active_teachers ?? 0) + (d?.users?.admins ?? 0) + (d?.users?.others ?? 0),
-          active_sessions: d?.active_sessions ?? 0,
+          pending_enrollments: d?.data?.grades?.pending_approvals ?? 0,
+          total_users: (d?.data?.users?.active_students ?? 0) + (d?.data?.users?.active_teachers ?? 0) + (d?.data?.users?.admins ?? 0) + (d?.data?.users?.others ?? 0),
+          active_sessions: d?.data?.active_sessions ?? 0,
         })
+      } catch {
+        setStats({ total_students: 0, total_teachers: 0, total_classrooms: 0, pending_enrollments: 0, total_users: 0, active_sessions: 0 })
       }
 
-      if (activitiesResult.status === 'fulfilled') {
-        setRecentActivities(activitiesResult.value.results || activitiesResult.value || [])
-      } else {
+      try {
+        const a = await api.get('/audit-logs/?limit=10')
+        activitiesResult = a.results || a.data || []
+        setRecentActivities(activitiesResult)
+      } catch {
         setRecentActivities([])
       }
 

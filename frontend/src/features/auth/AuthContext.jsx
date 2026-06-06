@@ -7,8 +7,12 @@ export const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isBootstrapped, setIsBootstrapped] = useState(false)
 
   const bootstrap = useCallback(async () => {
+    // Prevent multiple simultaneous bootstrap calls
+    if (isBootstrapped) return
+    
     logAuthState('bootstrap:start', { timestamp: new Date().toISOString() })
     try {
       const { data } = await api.post('/auth/refresh/')
@@ -17,6 +21,7 @@ export function AuthProvider({ children }) {
       const me = await api.get('/auth/me/')
       logAuthState('bootstrap:user-loaded', { user: me.data })
       setUser(me.data)
+      setIsBootstrapped(true)
     } catch (error) {
       logAuthState('bootstrap:failed', { error: error.message, status: error.response?.status })
       clearAccessToken()
@@ -25,7 +30,7 @@ export function AuthProvider({ children }) {
       setLoading(false)
       logAuthState('bootstrap:complete', {})
     }
-  }, [])
+  }, [isBootstrapped])
 
   useEffect(() => {
     bootstrap()
