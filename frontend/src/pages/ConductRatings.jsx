@@ -80,8 +80,8 @@ export default function ConductRatings() {
           classroomApi.getAll(),
           quarterApi.getAll(),
         ])
-        setClassrooms(classroomsRes.data)
-        setQuarters(quartersRes.data)
+        setClassrooms(Array.isArray(classroomsRes.data) ? classroomsRes.data : (classroomsRes.data?.results ?? []))
+        setQuarters(Array.isArray(quartersRes.data) ? quartersRes.data : (quartersRes.data?.results ?? []))
       } catch (err) {
         console.error('Failed to load initial data:', err)
         setError('Failed to load classes and quarters')

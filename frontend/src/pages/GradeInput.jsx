@@ -58,8 +58,8 @@ export default function GradeInput() {
           classroomApi.getAll(),
           quarterApi.getAll(),
         ])
-        setClassrooms(classroomsRes.data)
-        setQuarters(quartersRes.data)
+        setClassrooms(Array.isArray(classroomsRes.data) ? classroomsRes.data : (classroomsRes.data?.results ?? []))
+        setQuarters(Array.isArray(quartersRes.data) ? quartersRes.data : (quartersRes.data?.results ?? []))
       } catch (err) {
         console.error('Failed to load initial data:', err)
         setError('Failed to load classes and quarters')
@@ -80,7 +80,7 @@ export default function GradeInput() {
 
       try {
         const { data } = await classSubjectApi.getAll({ classroom: selectedClassroom })
-        setSubjects(data)
+        setSubjects(Array.isArray(data) ? data : (data?.results ?? []))
       } catch (err) {
         console.error('Failed to load subjects:', err)
         setError('Failed to load subjects for this class')

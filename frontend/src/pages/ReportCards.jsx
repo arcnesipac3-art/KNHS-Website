@@ -93,7 +93,7 @@ export default function ReportCards() {
 
       try {
         const { data } = await classroomApi.getEnrollments(selectedClassroom, 'active')
-        setStudents(data)
+        setStudents(Array.isArray(data) ? data : (data?.results ?? []))
       } catch (err) {
         console.error('Failed to load students:', err)
         setError('Failed to load students')
@@ -119,7 +119,7 @@ export default function ReportCards() {
       })
 
       // Create download link
-      const student = students.find(s => s.student_id === studentId)
+      const student = (Array.isArray(students) ? students : []).find(s => s.student_id === studentId)
       const filename = `SF9_${student?.student_lrn || studentId}_${selectedAcademicYear}.pdf`
       
       const url = window.URL.createObjectURL(new Blob([response.data]))

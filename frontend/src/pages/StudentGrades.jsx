@@ -20,14 +20,15 @@ export default function StudentGrades() {
     async function loadQuarters() {
       try {
         const { data } = await quarterApi.getAll()
-        setQuarters(data)
+        const quarterList = Array.isArray(data) ? data : (data?.results ?? [])
+        setQuarters(quarterList)
         
         // Auto-select current quarter
-        const current = data.find((q) => q.is_active)
+        const current = quarterList.find((q) => q.is_active)
         if (current) {
           setSelectedQuarter(current.id)
-        } else if (data.length > 0) {
-          setSelectedQuarter(data[0].id)
+        } else if (quarterList.length > 0) {
+          setSelectedQuarter(quarterList[0].id)
         }
       } catch (err) {
         console.error('Failed to load quarters:', err)
@@ -51,9 +52,10 @@ export default function StudentGrades() {
 
       try {
         const { data } = await gradeApi.getAll({ quarter: selectedQuarter })
+        const gradeList = Array.isArray(data) ? data : (data?.results ?? [])
         
         // Filter only published grades for students
-        const publishedGrades = data.filter((g) => g.status === 'published')
+        const publishedGrades = gradeList.filter((g) => g.status === 'published')
         setGrades(publishedGrades)
       } catch (err) {
         console.error('Failed to load grades:', err)
@@ -72,11 +74,11 @@ export default function StudentGrades() {
     passed: grades.filter((g) => g.transmuted_grade >= 75).length,
     failed: grades.filter((g) => g.transmuted_grade < 75).length,
     average: grades.length > 0
-      ? (grades.reduce((sum, g) => sum + g.transmuted_grade, 0) / grades.length).toFixed(2)
+      ? (grades.reduce((sum, g) => sum + (g.transmuted_grade || 0), 0) / grades.length).toFixed(2)
       : 0,
   }
 
-  const selectedQuarterData = quarters.find((q) => q.id === selectedQuarter)
+  const selectedQuarterData = (Array.isArray(quarters) ? quarters : []).find((q) => q.id === selectedQuarter)
 
   return (
     <PortalLayout>

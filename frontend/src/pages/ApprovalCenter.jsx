@@ -54,14 +54,15 @@ export default function ApprovalCenter() {
     async function loadQuarters() {
       try {
         const { data } = await quarterApi.getAll()
-        setQuarters(data)
+        const quarterList = Array.isArray(data) ? data : (data?.results ?? [])
+        setQuarters(quarterList)
         
         // Auto-select current quarter
-        const current = data.find((q) => q.is_active)
+        const current = quarterList.find((q) => q.is_active)
         if (current) {
           setSelectedQuarter(current.id)
-        } else if (data.length > 0) {
-          setSelectedQuarter(data[0].id)
+        } else if (quarterList.length > 0) {
+          setSelectedQuarter(quarterList[0].id)
         }
       } catch (err) {
         console.error('Failed to load quarters:', err)
@@ -87,7 +88,8 @@ export default function ApprovalCenter() {
 
       try {
         const { data } = await gradeApi.getApprovalQueue({ quarter: selectedQuarter })
-        setApprovalQueue(data)
+        const queueList = Array.isArray(data) ? data : (data?.results ?? [])
+        setApprovalQueue(queueList)
         setSelectedItems(new Set()) // Clear selections when queue changes
       } catch (err) {
         console.error('Failed to load approval queue:', err)

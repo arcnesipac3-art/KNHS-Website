@@ -28,7 +28,7 @@ export default function Materials() {
     async function loadClassrooms() {
       try {
         const { data } = await classroomApi.getAll()
-        setClassrooms(data)
+        setClassrooms(Array.isArray(data) ? data : (data?.results ?? []))
       } catch (err) {
         console.error('Failed to load classrooms:', err)
         setError('Failed to load classes')
@@ -48,7 +48,7 @@ export default function Materials() {
 
       try {
         const { data } = await classSubjectApi.getAll({ classroom: selectedClassroom })
-        setSubjects(data)
+        setSubjects(Array.isArray(data) ? data : (data?.results ?? []))
       } catch (err) {
         console.error('Failed to load subjects:', err)
         setError('Failed to load subjects')
@@ -70,7 +70,7 @@ export default function Materials() {
 
       try {
         const { data } = await learningMaterialApi.getAll({ class_subject: selectedSubject })
-        setMaterials(data)
+        setMaterials(Array.isArray(data) ? data : (data?.results ?? []))
       } catch (err) {
         console.error('Failed to load materials:', err)
         setError('Failed to load materials')
@@ -95,8 +95,8 @@ export default function Materials() {
     }
   }
 
-  const selectedClassroomData = classrooms.find((c) => c.id === selectedClassroom)
-  const selectedSubjectData = subjects.find((s) => s.id === selectedSubject)
+  const selectedClassroomData = (Array.isArray(classrooms) ? classrooms : []).find((c) => c.id === selectedClassroom)
+  const selectedSubjectData = (Array.isArray(subjects) ? subjects : []).find((s) => s.id === selectedSubject)
 
   return (
     <PortalLayout>
