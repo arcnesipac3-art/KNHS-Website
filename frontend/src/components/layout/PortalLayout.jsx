@@ -63,7 +63,7 @@ const NAV_BY_ROLE = {
     { to: '/reports', label: 'Reports & Exports' },
   ],
   parent: [
-    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/parent-dashboard', label: 'Dashboard' },
     { to: '/grades', label: 'Child Grades' },
     { to: '/messages', label: 'Messages' },
     { to: '/announcements', label: 'Announcements' },

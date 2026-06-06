@@ -9,10 +9,12 @@ from .views import (
     RefreshView,
     UpdateProfileView,
     UserManagementViewSet,
+    ParentStudentLinkViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'users', UserManagementViewSet, basename='user')
+router.register(r'parent-student-links', ParentStudentLinkViewSet, basename='parent-student-link')
 
 urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="auth-login"),

@@ -93,3 +93,60 @@ class UserProfile(models.Model):
     def full_name(self):
         parts = [self.first_name, self.middle_name, self.last_name]
         return " ".join(part for part in parts if part).strip()
+
+
+class ParentStudentLink(models.Model):
+    """Link between parent/guardian and student accounts."""
+
+    RELATIONSHIP_CHOICES = [
+        ("father", "Father"),
+        ("mother", "Mother"),
+        ("guardian", "Guardian"),
+        ("grandparent", "Grandparent"),
+        ("other", "Other"),
+    ]
+
+    STATUS_CHOICES = [
+        ("pending", "Pending Approval"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    parent = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="linked_students",
+        limit_choices_to={"role": User.Role.PARENT}
+    )
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="linked_parents",
+        limit_choices_to={"role": User.Role.STUDENT}
+    )
+    relationship = models.CharField(max_length=20, choices=RELATIONSHIP_CHOICES)
+    relationship_other = models.CharField(max_length=100, blank=True, help_text="Required if relationship is 'other'")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_parent_links"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [["parent", "student"]]
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["parent", "status"]),
+            models.Index(fields=["student", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.parent.display_name} - {self.student.display_name} ({self.get_relationship_display()})"

@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import User, UserProfile
+from .models import User, UserProfile, ParentStudentLink
 
 
 def generate_employee_id():
@@ -422,4 +422,79 @@ class UpdateUserSerializer(serializers.Serializer):
         profile.save()
 
         return instance
+
+
+class ParentStudentLinkSerializer(serializers.ModelSerializer):
+    """Serializer for parent-student links."""
+
+    parent_name = serializers.CharField(source="parent.display_name", read_only=True)
+    parent_email = serializers.EmailField(source="parent.email", read_only=True)
+    student_name = serializers.CharField(source="student.display_name", read_only=True)
+    student_email = serializers.EmailField(source="student.email", read_only=True)
+    student_lrn = serializers.CharField(source="student.profile.lrn", read_only=True)
+    student_grade_level = serializers.IntegerField(source="student.profile.grade_level", read_only=True)
+    relationship_display = serializers.CharField(source="get_relationship_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    approved_by_name = serializers.CharField(source="approved_by.display_name", read_only=True)
+
+    class Meta:
+        model = ParentStudentLink
+        fields = [
+            "id",
+            "parent",
+            "parent_name",
+            "parent_email",
+            "student",
+            "student_name",
+            "student_email",
+            "student_lrn",
+            "student_grade_level",
+            "relationship",
+            "relationship_display",
+            "relationship_other",
+            "status",
+            "status_display",
+            "approved_by",
+            "approved_by_name",
+            "approved_at",
+            "rejection_reason",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "approved_by", "approved_at", "created_at", "updated_at"]
+
+
+class CreateParentStudentLinkSerializer(serializers.Serializer):
+    """Serializer for creating a parent-student link request."""
+
+    student_id = serializers.UUIDField()
+    relationship = serializers.ChoiceField(choices=ParentStudentLink.RELATIONSHIP_CHOICES)
+    relationship_other = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    def validate_student_id(self, value):
+        """Validate that the student exists and is a student."""
+        try:
+            student = User.objects.get(id=value, role=User.Role.STUDENT)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Student not found")
+        return value
+
+    def validate(self, data):
+        """Validate the relationship field."""
+        if data.get("relationship") == "other" and not data.get("relationship_other"):
+            raise serializers.ValidationError("relationship_other is required when relationship is 'other'")
+        return data
+
+
+class ApproveParentStudentLinkSerializer(serializers.Serializer):
+    """Serializer for approving/rejecting parent-student links."""
+
+    action = serializers.ChoiceField(choices=["approve", "reject"])
+    rejection_reason = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        """Validate rejection reason when rejecting."""
+        if data.get("action") == "reject" and not data.get("rejection_reason"):
+            raise serializers.ValidationError("rejection_reason is required when rejecting")
+        return data
 

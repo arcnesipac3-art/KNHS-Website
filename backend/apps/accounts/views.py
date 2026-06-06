@@ -12,7 +12,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 import logging
 
-from .models import User
+from .models import User, ParentStudentLink
 from .serializers import (
     ChangePasswordSerializer,
     CreateUserSerializer,
@@ -22,6 +22,9 @@ from .serializers import (
     UserDetailSerializer,
     UserListSerializer,
     UserSerializer,
+    ParentStudentLinkSerializer,
+    CreateParentStudentLinkSerializer,
+    ApproveParentStudentLinkSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -447,4 +450,125 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         logger.info(f"User activated: {user.email} by admin: {request.user.email}")
         
         return Response({'detail': 'User activated successfully.'})
+
+
+class ParentStudentLinkViewSet(viewsets.ModelViewSet):
+    """Parent-student link management."""
+
+    serializer_class = ParentStudentLinkSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter queryset based on user role."""
+        user = self.request.user
+        
+        if user.role == User.Role.PARENT:
+            # Parents can only see their own links
+            return ParentStudentLink.objects.filter(parent=user).select_related('student', 'student__profile', 'approved_by')
+        elif user.role in [User.Role.ADMIN, User.Role.REGISTRAR]:
+            # Admin and registrar can see all links
+            return ParentStudentLink.objects.all().select_related('parent', 'student', 'student__profile', 'approved_by')
+        elif user.role == User.Role.STUDENT:
+            # Students can see links to their parents
+            return ParentStudentLink.objects.filter(student=user).select_related('parent', 'parent__profile', 'approved_by')
+        else:
+            # Other roles cannot see parent-student links
+            return ParentStudentLink.objects.none()
+
+    def perform_create(self, serializer):
+        """Create link with current user as parent."""
+        if self.request.user.role != User.Role.PARENT:
+            raise serializers.ValidationError("Only parents can create link requests")
+        serializer.save(parent=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def request_link(self, request):
+        """Request to link with a student."""
+        serializer = CreateParentStudentLinkSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        # Check if link already exists
+        student_id = serializer.validated_data['student_id']
+        existing_link = ParentStudentLink.objects.filter(
+            parent=request.user,
+            student_id=student_id
+        ).first()
+
+        if existing_link:
+            if existing_link.status == 'approved':
+                return Response(
+                    {"error": "Link already exists and is approved"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif existing_link.status == 'pending':
+                return Response(
+                    {"error": "Link request already pending approval"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                # Rejected link - allow re-request
+                existing_link.delete()
+
+        # Create new link request
+        link = ParentStudentLink.objects.create(
+            parent=request.user,
+            student_id=student_id,
+            relationship=serializer.validated_data['relationship'],
+            relationship_other=serializer.validated_data.get('relationship_other', ''),
+            status='pending'
+        )
+
+        return Response(
+            ParentStudentLinkSerializer(link, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def approve_link(self, request, pk=None):
+        """Approve or reject a parent-student link (admin/registrar only)."""
+        if request.user.role not in [User.Role.ADMIN, User.Role.REGISTRAR]:
+            return Response(
+                {"error": "Only admin and registrar can approve links"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        link = self.get_object()
+        serializer = ApproveParentStudentLinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        action = serializer.validated_data['action']
+        
+        if action == 'approve':
+            link.status = 'approved'
+            link.approved_by = request.user
+            link.approved_at = timezone.now()
+            link.rejection_reason = ''
+            link.save()
+        elif action == 'reject':
+            link.status = 'rejected'
+            link.approved_by = request.user
+            link.approved_at = timezone.now()
+            link.rejection_reason = serializer.validated_data.get('rejection_reason', '')
+            link.save()
+
+        return Response(
+            ParentStudentLinkSerializer(link, context={'request': request}).data
+        )
+
+    @action(detail=False, methods=['get'])
+    def my_children(self, request):
+        """Get list of approved children for current parent."""
+        if request.user.role != User.Role.PARENT:
+            return Response(
+                {"error": "Only parents can view their children"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        children = ParentStudentLink.objects.filter(
+            parent=request.user,
+            status='approved'
+        ).select_related('student', 'student__profile')
+
+        serializer = ParentStudentLinkSerializer(children, many=True, context={'request': request})
+        return Response(serializer.data)
 

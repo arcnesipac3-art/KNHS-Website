@@ -74,6 +74,7 @@ const RegistrarDashboard = lazy(() => import('./pages/RegistrarDashboard'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const Messages = lazy(() => import('./pages/Messages'))
+const ParentDashboard = lazy(() => import('./pages/ParentDashboard'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -116,6 +117,7 @@ function App() {
               <Route path="principal-dashboard" element={<PrincipalDashboard />} />
               <Route path="guidance-dashboard" element={<GuidanceDashboard />} />
               <Route path="registrar-dashboard" element={<RegistrarDashboard />} />
+              <Route path="parent-dashboard" element={<ParentDashboard />} />
               <Route path="force-password-change" element={<ForcePasswordChange />} />
               <Route path="classes" element={<MyClasses />} />
               <Route path="classes/join" element={<JoinClass />} />
