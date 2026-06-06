@@ -43,11 +43,7 @@ export default function AcademicCalendarPanel() {
       setAcademicYears(years)
       setEvents(events)
       
-      // Set selected year to current year
-      const currentYear = years.find(y => y.is_current)
-      if (currentYear) {
-        setSelectedYearId(currentYear.id)
-      }
+      // Don't auto-select current year - let user choose manually
     } catch (err) {
       console.error('Failed to load data:', err)
       setError('Failed to load academic calendar data')
@@ -260,16 +256,29 @@ export default function AcademicCalendarPanel() {
 
 // Academic Years Tab
 function AcademicYearsTab({ years, onAdd, onEdit, onSetCurrent, onDelete }) {
+  const currentYear = years.find(y => y.is_current)
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted">Manage school years and set the current active year.</p>
+        <div>
+          <p className="text-sm text-muted">Manage school years and set the current active year.</p>
+          {currentYear ? (
+            <p className="mt-1 text-xs text-green-600 font-medium">
+              ✓ Current: {currentYear.label}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-600 font-medium">
+              ⚠ No current academic year set
+            </p>
+          )}
+        </div>
         <Button onClick={onAdd}>+ Add Academic Year</Button>
       </div>
 
       <div className="space-y-3">
         {years.map((year) => (
-          <div key={year.id} className="rounded-lg border border-gray-200 p-4">
+          <div key={year.id} className={`rounded-lg border p-4 ${year.is_current ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3">
@@ -312,6 +321,7 @@ function AcademicYearsTab({ years, onAdd, onEdit, onSetCurrent, onDelete }) {
         {years.length === 0 && (
           <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-8 text-center">
             <p className="text-sm text-muted">No academic years yet. Add one to get started.</p>
+            <Button onClick={onAdd} className="mt-4">+ Add First Academic Year</Button>
           </div>
         )}
       </div>
@@ -343,6 +353,12 @@ function QuartersTab({ quarters, years, selectedYearId, onYearChange, onAdd, onE
         </div>
         <Button onClick={onAdd} disabled={!selectedYearId}>+ Add Quarter</Button>
       </div>
+
+      {!selectedYearId && (
+        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+          <p className="text-sm text-muted">Select an academic year to view and manage its quarters.</p>
+        </div>
+      )}
 
       {selectedYearId && (
         <div className="space-y-3">
@@ -382,6 +398,7 @@ function QuartersTab({ quarters, years, selectedYearId, onYearChange, onAdd, onE
           {quarters.length === 0 && (
             <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-8 text-center">
               <p className="text-sm text-muted">No quarters for this academic year yet.</p>
+              <Button onClick={onAdd} className="mt-4">+ Add First Quarter</Button>
             </div>
           )}
         </div>
@@ -561,15 +578,23 @@ function AcademicYearModal({ year, onClose, onSuccess }) {
             </div>
           </div>
 
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={formData.is_current}
-              onChange={(e) => setFormData({ ...formData, is_current: e.target.checked })}
-              className="h-5 w-5 rounded border-gray-300 text-knhs-purple"
-            />
-            <span className="text-sm text-text">Set as current academic year</span>
-          </label>
+          {year && (
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={formData.is_current}
+                onChange={(e) => setFormData({ ...formData, is_current: e.target.checked })}
+                className="h-5 w-5 rounded border-gray-300 text-knhs-purple"
+              />
+              <span className="text-sm text-text">Set as current academic year</span>
+            </label>
+          )}
+
+          {!year && (
+            <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+              After creating, use the "Set Current" button to mark this as the active academic year.
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
