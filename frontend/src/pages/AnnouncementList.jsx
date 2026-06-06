@@ -1,66 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { announcementApi } from '../lib/learningApi'
+import { useAnnouncements, useUnreadAnnouncements, useLikeAnnouncement, useUnlikeAnnouncement, useCommentAnnouncement, useMarkAnnouncementRead, useDeleteAnnouncement } from '../hooks/useAnnouncements'
+import AnnouncementSkeleton from '../components/ui/AnnouncementSkeleton'
 
 export default function AnnouncementList() {
   const { user } = useAuth()
-  const [announcements, setAnnouncements] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all') // all, unread
 
   const canCreate = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'principal'
 
-  useEffect(() => {
-    loadAnnouncements()
-  }, [filter])
+  // Fetch announcements based on filter
+  const { data: allAnnouncements = [], isLoading: allLoading, refetch: refetchAll } = useAnnouncements({ exclude_expired: true })
+  const { data: unreadAnnouncements = [], isLoading: unreadLoading, refetch: refetchUnread } = useUnreadAnnouncements()
 
-  async function loadAnnouncements() {
-    setLoading(true)
-    setError(null)
+  const announcements = filter === 'unread' ? unreadAnnouncements : allAnnouncements
+  const isLoading = filter === 'unread' ? unreadLoading : allLoading
 
-    try {
-      let data
-      if (filter === 'unread') {
-        const response = await announcementApi.getUnread()
-        data = response.data
-      } else {
-        const response = await announcementApi.getAll({ exclude_expired: true })
-        data = response.data
-      }
-      
-      const results = Array.isArray(data) ? data : (data?.results ?? [])
-      setAnnouncements(results)
-    } catch (err) {
-      console.error('Failed to load announcements:', err)
-      setError('Failed to load announcements. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Mutation hooks
+  const likeMutation = useLikeAnnouncement()
+  const unlikeMutation = useUnlikeAnnouncement()
+  const commentMutation = useCommentAnnouncement()
+  const markReadMutation = useMarkAnnouncementRead()
+  const deleteMutation = useDeleteAnnouncement()
 
   async function handleLike(id, isLiked) {
     try {
       if (isLiked) {
-        await announcementApi.unlike(id)
+        await unlikeMutation.mutateAsync(id)
       } else {
-        await announcementApi.like(id)
+        await likeMutation.mutateAsync(id)
       }
-      // Optimistic update or refresh
-      setAnnouncements(prev => prev.map(a => {
-        if (a.id === id) {
-          return {
-            ...a,
-            is_liked: !isLiked,
-            likes_count: isLiked ? a.likes_count - 1 : a.likes_count + 1
-          }
-        }
-        return a
-      }))
     } catch (err) {
       console.error('Failed to like/unlike:', err)
     }
@@ -68,17 +42,7 @@ export default function AnnouncementList() {
 
   async function handleComment(id, content) {
     try {
-      const response = await announcementApi.comment(id, content)
-      setAnnouncements(prev => prev.map(a => {
-        if (a.id === id) {
-          return {
-            ...a,
-            comments_count: a.comments_count + 1,
-            comments: [...(a.comments || []), response.data]
-          }
-        }
-        return a
-      }))
+      await commentMutation.mutateAsync({ id, content })
     } catch (err) {
       console.error('Failed to comment:', err)
     }
@@ -86,10 +50,7 @@ export default function AnnouncementList() {
 
   async function handleMarkAsRead(announcementId) {
     try {
-      await announcementApi.markRead(announcementId)
-      setAnnouncements(prev => prev.map(a => 
-        a.id === announcementId ? { ...a, is_read: true } : a
-      ))
+      await markReadMutation.mutateAsync(announcementId)
     } catch (err) {
       console.error('Failed to mark as read:', err)
     }
@@ -101,8 +62,7 @@ export default function AnnouncementList() {
     }
 
     try {
-      await announcementApi.delete(announcementId)
-      setAnnouncements((prev) => prev.filter((a) => a.id !== announcementId))
+      await deleteMutation.mutateAsync(announcementId)
     } catch (err) {
       console.error('Failed to delete announcement:', err)
       alert('Failed to delete announcement.')
@@ -155,10 +115,8 @@ export default function AnnouncementList() {
         </div>
 
         {/* Announcements List */}
-        {loading ? (
-          <div className="flex py-20 items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-purple-200 border-t-knhs-purple"></div>
-          </div>
+        {isLoading ? (
+          <AnnouncementSkeleton count={3} />
         ) : announcements.length === 0 ? (
           <div className="py-20 text-center space-y-4">
             <div className="text-5xl">📢</div>

@@ -1,68 +1,25 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import { getStudentDashboard } from '../lib/learningApi'
-import { getCurrentAcademicYearWithQuarters } from '../lib/academicApi'
-import api from '../lib/api'
+import { useStudentDashboard, useCurrentAcademicYear, useAttendanceSummary } from '../hooks/useDashboard'
+import DashboardSkeleton from '../components/ui/DashboardSkeleton'
 
 export default function StudentDashboard() {
   const { user } = useAuth()
-  const [dashboard, setDashboard] = useState(null)
-  const [academicYear, setAcademicYear] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [attendance, setAttendance] = useState(null)
 
-  useEffect(() => {
-    async function loadDashboard() {
-      const [dashboardResult, yearResult, attendanceResult] = await Promise.allSettled([
-        getStudentDashboard(),
-        getCurrentAcademicYearWithQuarters(),
-        api.get('/attendance/summary/'),
-      ])
+  // Fetch data with TanStack Query
+  const { data: dashboard, isLoading: dashboardLoading } = useStudentDashboard()
+  const { data: academicYear, isLoading: yearLoading } = useCurrentAcademicYear()
+  const { data: attendance, isLoading: attendanceLoading } = useAttendanceSummary()
 
-      if (dashboardResult.status === 'fulfilled') {
-        setDashboard(dashboardResult.value)
-      } else {
-        console.error('Failed to load dashboard:', dashboardResult.reason)
-        setDashboard({ unreadAnnouncements: [], unreadNotifications: [], pendingAssignments: [], overdueAssignments: [], publishedGrades: [], stats: { pendingCount: 0, overdueCount: 0, unreadNotifications: 0 } })
-      }
+  const isLoading = dashboardLoading || yearLoading || attendanceLoading
 
-      if (yearResult.status === 'fulfilled') {
-        setAcademicYear(yearResult.value)
-      } else {
-        setAcademicYear({ academicYear: null, quarters: [] })
-      }
-
-      if (attendanceResult.status === 'fulfilled') {
-        setAttendance(attendanceResult.value)
-      } else {
-        setAttendance(null)
-      }
-
-      setLoading(false)
-    }
-
-    loadDashboard()
-  }, [])
-
-  if (loading) {
+  if (isLoading) {
     return (
       <PortalLayout>
-        <div className="space-y-8">
-          <div className="h-32 animate-pulse rounded-2xl bg-purple-200" />
-          <div className="grid gap-4 md:grid-cols-4">
-            {[1,2,3,4].map(i => <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-200" />)}
-          </div>
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <div className="h-48 animate-pulse rounded-xl bg-gray-200" />
-            </div>
-            <div className="h-48 animate-pulse rounded-xl bg-gray-200" />
-          </div>
-        </div>
+        <DashboardSkeleton />
       </PortalLayout>
     )
   }

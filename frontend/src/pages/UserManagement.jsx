@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { userApi } from '../lib/userApi'
+import { useUsers, useDeleteUser, useToggleUserActive, useResetUserPassword, useCreateUser, useUpdateUser } from '../hooks/useUsers'
+import UserListSkeleton from '../components/ui/UserListSkeleton'
 
 // Generate a secure temporary password
 function generateTempPassword() {
@@ -54,10 +56,8 @@ const ROLE_LABELS = {
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth()
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
+  const [error, setError] = useState(null)
 
   const [filters, setFilters] = useState({ role: 'all', is_active: 'all', search: '' })
 
@@ -68,7 +68,19 @@ export default function UserManagement() {
   const [tempPassword, setTempPassword] = useState(null)
   const [newUserName, setNewUserName] = useState('')
 
-  useEffect(() => { loadUsers() }, [filters])
+  // Build query params from filters
+  const queryParams = {}
+  if (filters.role !== 'all') queryParams.role = filters.role
+  if (filters.is_active !== 'all') queryParams.is_active = filters.is_active
+  if (filters.search) queryParams.search = filters.search
+
+  // Fetch users with TanStack Query
+  const { data: users = [], isLoading, error: fetchError, refetch } = useUsers(queryParams)
+
+  // Mutation hooks
+  const deleteUserMutation = useDeleteUser()
+  const toggleActiveMutation = useToggleUserActive()
+  const resetPasswordMutation = useResetUserPassword()
 
   useEffect(() => {
     if (successMessage || error) {
@@ -77,30 +89,11 @@ export default function UserManagement() {
     }
   }, [successMessage, error])
 
-  async function loadUsers() {
-    try {
-      setLoading(true)
-      setError(null)
-      const params = {}
-      if (filters.role !== 'all') params.role = filters.role
-      if (filters.is_active !== 'all') params.is_active = filters.is_active
-      if (filters.search) params.search = filters.search
-      const { data } = await userApi.getAll(params)
-      setUsers(Array.isArray(data) ? data : (data?.results ?? []))
-    } catch (err) {
-      setError('Failed to load users. Please try again.')
-      setUsers([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function handleDelete(userId, userName) {
     if (!confirm(`Delete ${userName}? This cannot be undone.`)) return
     try {
-      await userApi.delete(userId)
+      await deleteUserMutation.mutateAsync(userId)
       setSuccessMessage(`${userName} deleted.`)
-      loadUsers()
     } catch (err) { setError(extractError(err)) }
   }
 
@@ -108,16 +101,15 @@ export default function UserManagement() {
     const action = isActive ? 'deactivate' : 'activate'
     if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${userName}?`)) return
     try {
-      isActive ? await userApi.deactivate(userId) : await userApi.activate(userId)
+      await toggleActiveMutation.mutateAsync({ id: userId, isActive })
       setSuccessMessage(`${userName} ${action}d.`)
-      loadUsers()
     } catch (err) { setError(extractError(err)) }
   }
 
   async function handleResetPassword(userId, userName) {
     if (!confirm(`Reset password for ${userName}? They must change it on next login.`)) return
     try {
-      const { data } = await userApi.resetPassword(userId)
+      const data = await resetPasswordMutation.mutateAsync(userId)
       setTempPassword(data.temporary_password)
       setNewUserName(userName)
       setShowPasswordModal(true)
@@ -208,11 +200,8 @@ export default function UserManagement() {
 
         {/* User Table */}
         <Card title={`Users (${users.length})`}>
-          {loading ? (
-            <div className="py-12 text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-purple-200 border-t-knhs-purple" />
-              <p className="mt-4 text-muted">Loading users...</p>
-            </div>
+          {isLoading ? (
+            <UserListSkeleton count={10} />
           ) : users.length === 0 ? (
             <div className="py-12 text-center text-muted">No users found.</div>
           ) : (
@@ -302,7 +291,7 @@ export default function UserManagement() {
               setShowCreateModal(false)
               setShowPasswordModal(true)
               setSuccessMessage(`User ${name} created successfully`)
-              loadUsers()
+              refetch()
             }}
           />
         )}
@@ -310,7 +299,7 @@ export default function UserManagement() {
           <EditUserModal
             user={selectedUser}
             onClose={closeModals}
-            onSuccess={() => { closeModals(); setSuccessMessage('User updated.'); loadUsers() }}
+            onSuccess={() => { closeModals(); setSuccessMessage('User updated.'); refetch() }}
           />
         )}
         {showPasswordModal && tempPassword && (
@@ -330,10 +319,10 @@ function CreateUserModal({ onClose, onSuccess }) {
     email: '', first_name: '', last_name: '', phone: '',
     lrn: '', grade_level: '', strand: '',
   })
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   const generatedPassword = useState(() => generateTempPassword())[0]
+  const createUserMutation = useCreateUser()
 
   const isStudent = role === 'student'
   const isSHS = isStudent && (formData.grade_level === '11' || formData.grade_level === '12')
@@ -344,7 +333,6 @@ function CreateUserModal({ onClose, onSuccess }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setSaving(true)
     setError(null)
     try {
       const payload = {
@@ -362,11 +350,10 @@ function CreateUserModal({ onClose, onSuccess }) {
         payload.grade_level = formData.grade_level ? parseInt(formData.grade_level) : null
         payload.strand = isSHS ? formData.strand : ''
       }
-      await userApi.create(payload)
+      await createUserMutation.mutateAsync(payload)
       onSuccess(generatedPassword, `${formData.first_name} ${formData.last_name}`.trim())
     } catch (err) {
       setError(extractError(err))
-      setSaving(false)
     }
   }
 
@@ -519,11 +506,11 @@ function CreateUserModal({ onClose, onSuccess }) {
           </div>
 
           <div className="flex gap-3 border-t border-gray-200 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={saving} className="flex-1">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={createUserMutation.isPending} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" disabled={saving} className="flex-1">
-              {saving ? 'Creating...' : `Create ${ROLE_LABELS[role]}`}
+            <Button type="submit" disabled={createUserMutation.isPending} className="flex-1">
+              {createUserMutation.isPending ? 'Creating...' : `Create ${ROLE_LABELS[role]}`}
             </Button>
           </div>
         </form>
@@ -548,8 +535,9 @@ function EditUserModal({ user, onClose, onSuccess }) {
     is_active: user.is_active,
     is_approved: user.is_approved,
   })
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+
+  const updateUserMutation = useUpdateUser()
 
   const isStudent = formData.role === 'student'
   const isSHS = isStudent && (formData.grade_level === '11' || formData.grade_level === '12')
@@ -560,7 +548,6 @@ function EditUserModal({ user, onClose, onSuccess }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setSaving(true)
     setError(null)
     try {
       const payload = {
@@ -577,11 +564,10 @@ function EditUserModal({ user, onClose, onSuccess }) {
         payload.grade_level = formData.grade_level ? parseInt(formData.grade_level) : null
         payload.strand = isSHS ? formData.strand : ''
       }
-      await userApi.update(user.id, payload)
+      await updateUserMutation.mutateAsync({ id: user.id, ...payload })
       onSuccess()
     } catch (err) {
       setError(extractError(err))
-      setSaving(false)
     }
   }
 
@@ -700,8 +686,8 @@ function EditUserModal({ user, onClose, onSuccess }) {
           </div>
 
           <div className="flex gap-3 border-t border-gray-200 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={saving} className="flex-1">Cancel</Button>
-            <Button type="submit" disabled={saving} className="flex-1">{saving ? 'Saving...' : 'Save Changes'}</Button>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={updateUserMutation.isPending} className="flex-1">Cancel</Button>
+            <Button type="submit" disabled={updateUserMutation.isPending} className="flex-1">{updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
           </div>
         </form>
       </div>

@@ -1,87 +1,27 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import PortalLayout from '../components/layout/PortalLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import { getTeacherDashboard } from '../lib/learningApi'
-import { getCurrentAcademicYearWithQuarters } from '../lib/academicApi'
-import api from '../lib/api'
+import { useTeacherDashboard, useCurrentAcademicYear, useStudentAlerts, useTodaySchedule, useRecentAnnouncements } from '../hooks/useDashboard'
+import DashboardSkeleton from '../components/ui/DashboardSkeleton'
 
 export default function TeacherDashboard() {
   const { user } = useAuth()
-  const [dashboard, setDashboard] = useState(null)
-  const [academicYear, setAcademicYear] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [studentAlerts, setStudentAlerts] = useState([])
-  const [announcements, setAnnouncements] = useState([])
-  const [todaySchedule, setTodaySchedule] = useState([])
 
-  useEffect(() => {
-    async function loadDashboard() {
-      const [dashboardResult, yearResult, alertsResult, announcementsResult, scheduleResult] = await Promise.allSettled([
-        getTeacherDashboard(),
-        getCurrentAcademicYearWithQuarters(),
-        api.get('/attendance/student-alerts/'),
-        api.get('/announcements/?limit=5'),
-        api.get('/schedule/today/'),
-      ])
+  // Fetch data with TanStack Query
+  const { data: dashboard, isLoading: dashboardLoading } = useTeacherDashboard()
+  const { data: academicYear, isLoading: yearLoading } = useCurrentAcademicYear()
+  const { data: studentAlerts = [], isLoading: alertsLoading } = useStudentAlerts()
+  const { data: announcements = [], isLoading: announcementsLoading } = useRecentAnnouncements(5)
+  const { data: todaySchedule = [], isLoading: scheduleLoading } = useTodaySchedule()
 
-      if (dashboardResult.status === 'fulfilled') {
-        setDashboard(dashboardResult.value)
-      } else {
-        console.error('Error fetching teacher dashboard:', dashboardResult.reason)
-        setDashboard({ myAssignments: [], ungradedSubmissions: [], draftGrades: [], stats: { totalAssignments: 0, ungradedCount: 0, draftGradesCount: 0 } })
-      }
+  const isLoading = dashboardLoading || yearLoading || alertsLoading || announcementsLoading || scheduleLoading
 
-      if (yearResult.status === 'fulfilled') {
-        setAcademicYear(yearResult.value)
-      } else {
-        setAcademicYear({ academicYear: null, quarters: [] })
-      }
-
-      if (alertsResult.status === 'fulfilled') {
-        setStudentAlerts(alertsResult.value.results || alertsResult.value || [])
-      } else {
-        setStudentAlerts([])
-      }
-
-      if (announcementsResult.status === 'fulfilled') {
-        setAnnouncements(announcementsResult.value.results || announcementsResult.value || [])
-      } else {
-        setAnnouncements([])
-      }
-
-      if (scheduleResult.status === 'fulfilled') {
-        setTodaySchedule(scheduleResult.value || [])
-      } else {
-        setTodaySchedule([])
-      }
-
-      setLoading(false)
-    }
-
-    loadDashboard()
-  }, [])
-
-  if (loading) {
+  if (isLoading) {
     return (
       <PortalLayout>
-        <div className="space-y-8">
-          {/* Skeleton banner */}
-          <div className="h-32 animate-pulse rounded-2xl bg-purple-200" />
-          {/* Skeleton KPI cards */}
-          <div className="grid gap-4 md:grid-cols-4">
-            {[1,2,3,4].map(i => <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-200" />)}
-          </div>
-          {/* Skeleton content */}
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <div className="h-48 animate-pulse rounded-xl bg-gray-200" />
-            </div>
-            <div className="h-48 animate-pulse rounded-xl bg-gray-200" />
-          </div>
-        </div>
+        <DashboardSkeleton />
       </PortalLayout>
     )
   }

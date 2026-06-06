@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider } from './features/auth/AuthContext'
 import { ProtectedRoute, PublicOnlyRoute } from './features/auth/ProtectedRoute'
@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 import LoadingSpinner from './components/ui/LoadingSpinner'
 import { initPostHog } from './lib/analytics'
 import { initSentry } from './lib/sentry'
+import { queryClient } from './lib/queryClient'
 
 // Keep the Render free-tier backend alive — ping /api/health/ (no DB, no auth, <5ms)
 // every 9 minutes so the server never hits the 15-min inactivity sleep threshold.
@@ -83,15 +84,6 @@ const ClassroomManagement = lazy(() => import('./pages/ClassroomManagement'))
 const SubjectAssignment = lazy(() => import('./pages/SubjectAssignment'))
 const StudentEnrollment = lazy(() => import('./pages/StudentEnrollment'))
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
-      refetchOnWindowFocus: false,
-    },
-  },
-})
 
 function App() {
   // Initialize analytics and error tracking
