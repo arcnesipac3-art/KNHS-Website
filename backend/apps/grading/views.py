@@ -421,7 +421,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             {"message": f"Returned {rejected_count} grades for revision", "count": rejected_count}
         )
 
-    @action(detail=False, methods=["post"], throttle_scope="lock")
+    @action(detail=False, methods=["post"])
     def lock(self, request):
         """Lock published grades after release."""
         if request.user.role not in ["principal", "admin"]:
@@ -464,7 +464,7 @@ class GradeViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["post"], throttle_scope="unlock")
+    @action(detail=True, methods=["post"])
     def unlock(self, request, pk=None):
         """Unlock a published grade for editing."""
         if request.user.role != "admin":
