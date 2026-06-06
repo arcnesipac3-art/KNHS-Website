@@ -7,6 +7,7 @@ import Button from '../components/ui/Button'
 import { userApi } from '../lib/userApi'
 import { attendanceApi } from '../lib/learningApi'
 import { classroomApi } from '../lib/academicApi'
+import api from '../lib/api'
 
 export default function GuidanceDashboard() {
   const { user } = useAuth()
@@ -17,9 +18,14 @@ export default function GuidanceDashboard() {
   const [selectedStudent, setSelectedStudent] = useState(null)
   const [studentRecords, setStudentRecords] = useState(null)
   const [loadingRecords, setLoadingRecords] = useState(false)
+  const [cases, setCases] = useState([])
+  const [selectedCase, setSelectedCase] = useState(null)
+  const [showCaseForm, setShowCaseForm] = useState(false)
+  const [showNoteForm, setShowNoteForm] = useState(false)
 
   useEffect(() => {
     loadStudents()
+    loadCases()
   }, [])
 
   async function loadStudents() {
@@ -27,6 +33,79 @@ export default function GuidanceDashboard() {
     const arr = Array.isArray(res.data) ? res.data : (res.data?.results ?? [])
     setStudents(arr)
     setLoading(false)
+  }
+
+  async function loadCases() {
+    try {
+      const response = await api.get('/communications/counseling-cases/')
+      setCases(response.data.results || response.data)
+    } catch (error) {
+      console.error('Failed to load counseling cases:', error)
+    }
+  }
+
+  async function handleCreateCase(e) {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const data = {
+      student_id: formData.get('student_id'),
+      case_type: formData.get('case_type'),
+      case_type_other: formData.get('case_type_other'),
+      title: formData.get('title'),
+      description: formData.get('description'),
+      severity: formData.get('severity'),
+      referral_source: formData.get('referral_source'),
+      referral_date: formData.get('referral_date'),
+    }
+
+    try {
+      await api.post('/communications/counseling-cases/create_case/', data)
+      setShowCaseForm(false)
+      loadCases()
+    } catch (error) {
+      console.error('Failed to create case:', error)
+      alert('Failed to create case. Please try again.')
+    }
+  }
+
+  async function handleUpdateStatus(caseId, newStatus) {
+    try {
+      await api.post(`/communications/counseling-cases/${caseId}/update_status/`, { status: newStatus })
+      loadCases()
+    } catch (error) {
+      console.error('Failed to update status:', error)
+      alert('Failed to update status. Please try again.')
+    }
+  }
+
+  async function handleAddNote(e) {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const data = {
+      note: formData.get('note'),
+      is_private: formData.get('is_private') === 'true',
+    }
+
+    try {
+      await api.post(`/communications/counseling-cases/${selectedCase.id}/add_note/`, data)
+      setShowNoteForm(false)
+      loadCases()
+    } catch (error) {
+      console.error('Failed to add note:', error)
+      alert('Failed to add note. Please try again.')
+    }
+  }
+
+  async function handleViewCaseNotes(caseId) {
+    try {
+      const response = await api.get(`/communications/counseling-cases/${caseId}/notes/`)
+      const caseWithNotes = cases.find(c => c.id === caseId)
+      if (caseWithNotes) {
+        setSelectedCase({ ...caseWithNotes, notes: response.data })
+      }
+    } catch (error) {
+      console.error('Failed to load notes:', error)
+    }
   }
 
   async function openStudentProfile(student) {
@@ -64,6 +143,9 @@ export default function GuidanceDashboard() {
   })
 
   const atRiskStudents = students.filter(s => s.is_active).length  // placeholder stat
+  const openCases = cases.filter(c => c.status === 'open').length
+  const inProgressCases = cases.filter(c => c.status === 'in_progress').length
+  const resolvedCases = cases.filter(c => c.status === 'resolved').length
 
   return (
     <PortalLayout>
@@ -90,6 +172,308 @@ export default function GuidanceDashboard() {
             <p className="text-sm text-muted">Inactive Accounts</p>
           </Card>
         </div>
+
+        {/* Counseling Cases Section */}
+        <Card>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-text">Counseling Cases</h2>
+            <Button onClick={() => setShowCaseForm(true)}>Create New Case</Button>
+          </div>
+          <div className="mb-4 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-lg bg-blue-50 p-3">
+              <p className="text-2xl font-bold text-blue-700">{openCases}</p>
+              <p className="text-sm text-blue-600">Open Cases</p>
+            </div>
+            <div className="rounded-lg bg-amber-50 p-3">
+              <p className="text-2xl font-bold text-amber-700">{inProgressCases}</p>
+              <p className="text-sm text-amber-600">In Progress</p>
+            </div>
+            <div className="rounded-lg bg-green-50 p-3">
+              <p className="text-2xl font-bold text-green-700">{resolvedCases}</p>
+              <p className="text-sm text-green-600">Resolved</p>
+            </div>
+          </div>
+          {cases.length === 0 ? (
+            <p className="py-8 text-center text-muted">No counseling cases found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Student</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Title</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Type</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Severity</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Status</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Created</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-text">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cases.map(case_ => (
+                    <tr key={case_.id} className="border-b border-gray-100">
+                      <td className="px-4 py-3 text-sm text-text">{case_.student_name}</td>
+                      <td className="px-4 py-3 text-sm text-text">{case_.title}</td>
+                      <td className="px-4 py-3 text-sm text-text">{case_.case_type_display}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-medium ${
+                            case_.severity === 'urgent'
+                              ? 'bg-red-100 text-red-800'
+                              : case_.severity === 'high'
+                              ? 'bg-orange-100 text-orange-800'
+                              : case_.severity === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}
+                        >
+                          {case_.severity_display}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-medium ${
+                            case_.status === 'open'
+                              ? 'bg-blue-100 text-blue-800'
+                              : case_.status === 'in_progress'
+                              ? 'bg-amber-100 text-amber-800'
+                              : case_.status === 'resolved'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {case_.status_display}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted">
+                        {new Date(case_.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="secondary" onClick={() => handleViewCaseNotes(case_.id)}>
+                            View
+                          </Button>
+                          <select
+                            value={case_.status}
+                            onChange={e => handleUpdateStatus(case_.id, e.target.value)}
+                            className="rounded border border-gray-300 px-2 py-1 text-xs"
+                          >
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        {/* Case Form Modal */}
+        {showCaseForm && (
+          <Card>
+            <h2 className="mb-4 text-xl font-semibold text-text">Create New Counseling Case</h2>
+            <form onSubmit={handleCreateCase} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">Student</label>
+                <select
+                  name="student_id"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                >
+                  <option value="">Select a student</option>
+                  {students.map(student => (
+                    <option key={student.id} value={student.id}>
+                      {student.full_name || student.email} (Grade {student.grade_level})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">Case Type</label>
+                <select
+                  name="case_type"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                >
+                  <option value="">Select type</option>
+                  <option value="academic">Academic Concern</option>
+                  <option value="behavioral">Behavioral Issue</option>
+                  <option value="personal">Personal Problem</option>
+                  <option value="social">Social Issue</option>
+                  <option value="family">Family Problem</option>
+                  <option value="health">Health/Mental Health</option>
+                  <option value="attendance">Attendance Issue</option>
+                  <option value="disciplinary">Disciplinary Action</option>
+                  <option value="referral">Referral</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">Title</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  placeholder="Brief title for the case"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">Description</label>
+                <textarea
+                  name="description"
+                  required
+                  rows={4}
+                  placeholder="Detailed description of the case"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">Severity</label>
+                <select
+                  name="severity"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">Referral Source</label>
+                <input
+                  type="text"
+                  name="referral_source"
+                  placeholder="Who referred this case"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">Referral Date</label>
+                <input
+                  type="date"
+                  name="referral_date"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setShowCaseForm(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Create Case</Button>
+              </div>
+            </form>
+          </Card>
+        )}
+
+        {/* Case Details Modal */}
+        {selectedCase && !showCaseForm && (
+          <Card>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-text">Case Details</h2>
+              <Button variant="secondary" onClick={() => setSelectedCase(null)}>
+                Close
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted">Student</p>
+                <p className="font-medium text-text">{selectedCase.student_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted">Title</p>
+                <p className="font-medium text-text">{selectedCase.title}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted">Type</p>
+                <p className="font-medium text-text">{selectedCase.case_type_display}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted">Description</p>
+                <p className="text-text">{selectedCase.description}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted">Severity</p>
+                <p className="font-medium text-text">{selectedCase.severity_display}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted">Status</p>
+                <p className="font-medium text-text">{selectedCase.status_display}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted">Referral Source</p>
+                <p className="text-text">{selectedCase.referral_source || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted">Created</p>
+                <p className="text-text">{new Date(selectedCase.created_at).toLocaleString()}</p>
+              </div>
+              
+              <div className="border-t border-gray-200 pt-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-text">Notes</h3>
+                  <Button size="sm" onClick={() => setShowNoteForm(true)}>
+                    Add Note
+                  </Button>
+                </div>
+                {selectedCase.notes && selectedCase.notes.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedCase.notes.map(note => (
+                      <div key={note.id} className="rounded-lg bg-gray-50 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-sm font-medium text-text">{note.author_name}</p>
+                          <p className="text-xs text-muted">
+                            {new Date(note.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <p className="text-sm text-text">{note.note}</p>
+                        {note.is_private && (
+                          <p className="mt-1 text-xs text-amber-600">Private note</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">No notes yet.</p>
+                )}
+              </div>
+
+              {showNoteForm && (
+                <form onSubmit={handleAddNote} className="space-y-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">Note</label>
+                    <textarea
+                      name="note"
+                      required
+                      rows={3}
+                      placeholder="Enter your note"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-knhs-purple focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" name="is_private" value="true" className="rounded border-gray-300" />
+                      <span className="text-sm font-medium text-text">Private note (guidance only)</span>
+                    </label>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="secondary" onClick={() => setShowNoteForm(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit">Add Note</Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </Card>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Student lookup */}

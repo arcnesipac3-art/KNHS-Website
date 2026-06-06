@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.academics.permissions import IsAdminUser
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote
 from .serializers import (
     AnnouncementSerializer,
     AnnouncementAttachmentSerializer,
@@ -18,6 +18,9 @@ from .serializers import (
     MessageThreadSerializer,
     CreateMessageThreadSerializer,
     CreateMessageSerializer,
+    CounselingCaseSerializer,
+    CreateCounselingCaseSerializer,
+    CounselingNoteSerializer,
 )
 
 
@@ -337,3 +340,157 @@ class MessageViewSet(viewsets.ModelViewSet):
             message.is_read = True
             message.save()
         return Response({"message": "Message marked as read"})
+
+
+class CounselingCaseViewSet(viewsets.ModelViewSet):
+    """Counseling case management."""
+
+    serializer_class = CounselingCaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter queryset based on user role."""
+        user = self.request.user
+        
+        if user.role == "guidance":
+            # Guidance staff can see all cases
+            return CounselingCase.objects.select_related('student', 'student__profile', 'counselor').all()
+        elif user.role in ["admin", "principal"]:
+            # Admin and principal can see all cases
+            return CounselingCase.objects.select_related('student', 'student__profile', 'counselor').all()
+        elif user.role == "student":
+            # Students can only see their own cases
+            return CounselingCase.objects.filter(student=user).select_related('student', 'student__profile', 'counselor')
+        else:
+            # Other roles cannot see counseling cases
+            return CounselingCase.objects.none()
+
+    def perform_create(self, serializer):
+        """Create case with current user as counselor if they are guidance staff."""
+        if self.request.user.role == "guidance":
+            serializer.save(counselor=self.request.user)
+        else:
+            serializer.save()
+
+    @action(detail=False, methods=['post'])
+    def create_case(self, request):
+        """Create a new counseling case."""
+        serializer = CreateCounselingCaseSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        # Create the case
+        case = CounselingCase.objects.create(
+            student_id=serializer.validated_data['student_id'],
+            case_type=serializer.validated_data['case_type'],
+            case_type_other=serializer.validated_data.get('case_type_other', ''),
+            title=serializer.validated_data['title'],
+            description=serializer.validated_data['description'],
+            severity=serializer.validated_data['severity'],
+            referral_source=serializer.validated_data.get('referral_source', ''),
+            referral_date=serializer.validated_data.get('referral_date'),
+            counselor=request.user if request.user.role == "guidance" else None,
+        )
+
+        return Response(
+            CounselingCaseSerializer(case, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def assign_counselor(self, request, pk=None):
+        """Assign a counselor to the case (guidance only)."""
+        if request.user.role != "guidance":
+            return Response(
+                {"error": "Only guidance staff can assign counselors"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        case = self.get_object()
+        counselor_id = request.data.get('counselor_id')
+        
+        if not counselor_id:
+            return Response(
+                {"error": "counselor_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from apps.accounts.models import User
+        try:
+            counselor = User.objects.get(id=counselor_id, role="guidance")
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Counselor not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        case.counselor = counselor
+        case.save()
+
+        return Response(
+            CounselingCaseSerializer(case, context={'request': request}).data
+        )
+
+    @action(detail=True, methods=['post'])
+    def update_status(self, request, pk=None):
+        """Update case status."""
+        case = self.get_object()
+        new_status = request.data.get('status')
+        
+        if not new_status:
+            return Response(
+                {"error": "status is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if new_status not in [choice[0] for choice in CounselingCase.STATUS_CHOICES]:
+            return Response(
+                {"error": "Invalid status"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        case.status = new_status
+        if new_status in ["resolved", "closed"]:
+            case.resolved_at = timezone.now()
+            case.resolution_notes = request.data.get('resolution_notes', '')
+        
+        case.save()
+
+        return Response(
+            CounselingCaseSerializer(case, context={'request': request}).data
+        )
+
+    @action(detail=True, methods=['get'])
+    def notes(self, request, pk=None):
+        """Get notes for this case."""
+        case = self.get_object()
+        
+        # Filter private notes based on user role
+        if request.user.role not in ["guidance", "admin", "principal"]:
+            notes = case.notes.filter(is_private=False)
+        else:
+            notes = case.notes.all()
+        
+        serializer = CounselingNoteSerializer(notes, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def add_note(self, request, pk=None):
+        """Add a note to the case."""
+        case = self.get_object()
+        
+        # Only guidance staff can add private notes
+        is_private = request.data.get('is_private', False)
+        if is_private and request.user.role not in ["guidance", "admin", "principal"]:
+            is_private = False
+        
+        note = CounselingNote.objects.create(
+            case=case,
+            author=request.user,
+            note=request.data.get('note'),
+            is_private=is_private
+        )
+        
+        return Response(
+            CounselingNoteSerializer(note, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )

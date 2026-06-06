@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote
 
 
 class AnnouncementAttachmentSerializer(serializers.ModelSerializer):
@@ -240,3 +240,103 @@ class CreateMessageSerializer(serializers.Serializer):
     """Serializer for creating a new message in a thread."""
 
     content = serializers.CharField(required=True)
+
+
+class CounselingNoteSerializer(serializers.ModelSerializer):
+    """Serializer for counseling case notes."""
+
+    author_name = serializers.CharField(source="author.display_name", read_only=True)
+
+    class Meta:
+        model = CounselingNote
+        fields = [
+            "id",
+            "case",
+            "author",
+            "author_name",
+            "note",
+            "is_private",
+            "created_at",
+        ]
+        read_only_fields = ["id", "author", "created_at"]
+
+
+class CounselingCaseSerializer(serializers.ModelSerializer):
+    """Serializer for counseling cases."""
+
+    student_name = serializers.CharField(source="student.display_name", read_only=True)
+    student_email = serializers.EmailField(source="student.email", read_only=True)
+    student_lrn = serializers.CharField(source="student.profile.lrn", read_only=True)
+    student_grade_level = serializers.IntegerField(source="student.profile.grade_level", read_only=True)
+    counselor_name = serializers.CharField(source="counselor.display_name", read_only=True)
+    case_type_display = serializers.CharField(source="get_case_type_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    severity_display = serializers.CharField(source="get_severity_display", read_only=True)
+    notes_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CounselingCase
+        fields = [
+            "id",
+            "student",
+            "student_name",
+            "student_email",
+            "student_lrn",
+            "student_grade_level",
+            "counselor",
+            "counselor_name",
+            "case_type",
+            "case_type_display",
+            "case_type_other",
+            "title",
+            "description",
+            "severity",
+            "severity_display",
+            "status",
+            "status_display",
+            "referral_source",
+            "referral_date",
+            "resolution_notes",
+            "resolved_at",
+            "created_at",
+            "updated_at",
+            "notes_count",
+        ]
+        read_only_fields = [
+            "id",
+            "resolved_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_notes_count(self, obj):
+        """Get count of notes for this case."""
+        return obj.notes.count()
+
+
+class CreateCounselingCaseSerializer(serializers.Serializer):
+    """Serializer for creating a new counseling case."""
+
+    student_id = serializers.UUIDField()
+    case_type = serializers.ChoiceField(choices=CounselingCase.CASE_TYPE_CHOICES)
+    case_type_other = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    title = serializers.CharField(max_length=200)
+    description = serializers.CharField()
+    severity = serializers.ChoiceField(choices=CounselingCase.SEVERITY_CHOICES, default="medium")
+    referral_source = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    referral_date = serializers.DateField(required=False, allow_null=True)
+
+    def validate_student_id(self, value):
+        """Validate that the student exists."""
+        from apps.accounts.models import User
+        try:
+            student = User.objects.get(id=value, role="student")
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Student not found")
+        return value
+
+    def validate(self, data):
+        """Validate the case_type_other field."""
+        if data.get("case_type") == "other" and not data.get("case_type_other"):
+            raise serializers.ValidationError("case_type_other is required when case_type is 'other'")
+        return data

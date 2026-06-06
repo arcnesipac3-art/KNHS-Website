@@ -237,3 +237,107 @@ class Message(models.Model):
 
     def __str__(self):
         return f'Message from {self.sender.display_name} at {self.created_at}'
+
+
+class CounselingCase(models.Model):
+    """Counseling case management for guidance office."""
+
+    CASE_TYPE_CHOICES = [
+        ("academic", "Academic Concern"),
+        ("behavioral", "Behavioral Issue"),
+        ("personal", "Personal Problem"),
+        ("social", "Social Issue"),
+        ("family", "Family Problem"),
+        ("health", "Health/Mental Health"),
+        ("attendance", "Attendance Issue"),
+        ("disciplinary", "Disciplinary Action"),
+        ("referral", "Referral"),
+        ("other", "Other"),
+    ]
+
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("in_progress", "In Progress"),
+        ("resolved", "Resolved"),
+        ("closed", "Closed"),
+        ("referred", "Referred"),
+    ]
+
+    SEVERITY_CHOICES = [
+        ("low", "Low"),
+        ("medium", "Medium"),
+        ("high", "High"),
+        ("urgent", "Urgent"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="counseling_cases",
+        limit_choices_to={"role": "student"}
+    )
+    counselor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_cases",
+        limit_choices_to={"role": "guidance"}
+    )
+    case_type = models.CharField(max_length=20, choices=CASE_TYPE_CHOICES)
+    case_type_other = models.CharField(max_length=100, blank=True, help_text="Required if case_type is 'other'")
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default="medium")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    referral_source = models.CharField(max_length=100, blank=True, help_text="Who referred this case")
+    referral_date = models.DateField(null=True, blank=True)
+    resolution_notes = models.TextField(blank=True, help_text="Notes on how the case was resolved")
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["student", "status"]),
+            models.Index(fields=["counselor", "status"]),
+            models.Index(fields=["case_type", "status"]),
+            models.Index(fields=["severity", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.student.display_name} ({self.get_status_display()})"
+
+
+class CounselingNote(models.Model):
+    """Notes and updates for counseling cases."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey(
+        CounselingCase,
+        on_delete=models.CASCADE,
+        related_name="notes"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="counseling_notes"
+    )
+    note = models.TextField()
+    is_private = models.BooleanField(
+        default=False,
+        help_text="Private notes are only visible to guidance staff"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["case", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Note for {self.case.title} by {self.author.display_name if self.author else 'Unknown'}"
