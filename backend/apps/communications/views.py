@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.academics.permissions import IsAdminUser
-from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote, AnnouncementLike, AnnouncementComment
+from .models import Announcement, AnnouncementAttachment, AnnouncementRead, Notification, NotificationPreferences, Message, MessageThread, CounselingCase, CounselingNote, AnnouncementLike, AnnouncementComment, Friendship
 from .serializers import (
     AnnouncementSerializer,
     AnnouncementAttachmentSerializer,
@@ -23,6 +23,8 @@ from .serializers import (
     CreateCounselingCaseSerializer,
     CounselingNoteSerializer,
     AnnouncementCommentSerializer,
+    FriendshipSerializer,
+    FriendshipCreateSerializer,
 )
 
 
@@ -550,3 +552,123 @@ class CounselingCaseViewSet(viewsets.ModelViewSet):
             CounselingNoteSerializer(note, context={'request': request}).data,
             status=status.HTTP_201_CREATED
         )
+
+
+class FriendshipViewSet(viewsets.ModelViewSet):
+    """Friend management - send, accept, reject, and list friends."""
+
+    serializer_class = FriendshipSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Get friendships for the current user."""
+        user = self.request.user
+        # Get friendships where user is either requester or recipient
+        return Friendship.objects.filter(
+            Q(requester=user) | Q(recipient=user)
+        ).select_related("requester", "recipient").distinct()
+
+    def get_serializer_class(self):
+        """Use different serializer for creation."""
+        if self.action == "create":
+            return FriendshipCreateSerializer
+        return FriendshipSerializer
+
+    def perform_create(self, serializer):
+        """Set requester to current user."""
+        serializer.save(requester=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def my_friends(self, request):
+        """Get list of accepted friends."""
+        user = request.user
+        friendships = Friendship.objects.filter(
+            Q(requester=user) | Q(recipient=user),
+            status="accepted"
+        ).select_related("requester", "recipient")
+        
+        friends = []
+        for friendship in friendships:
+            friend = friendship.recipient if friendship.requester == user else friendship.requester
+            friends.append({
+                "id": friend.id,
+                "display_name": friend.display_name,
+                "email": friend.email,
+                "role": friend.role,
+                "friendship_id": friendship.id,
+                "status": friendship.status,
+            })
+        
+        return Response(friends)
+
+    @action(detail=False, methods=["get"])
+    def pending_requests(self, request):
+        """Get pending friend requests for current user."""
+        user = request.user
+        pending = Friendship.objects.filter(
+            recipient=user,
+            status="pending"
+        ).select_related("requester")
+        
+        serializer = FriendshipSerializer(pending, many=True, context={"request": request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def accept(self, request, pk=None):
+        """Accept a friend request."""
+        friendship = self.get_object()
+        
+        if friendship.recipient != request.user:
+            return Response(
+                {"error": "You can only accept requests sent to you"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if friendship.status != "pending":
+            return Response(
+                {"error": "This request is not pending"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        friendship.status = "accepted"
+        friendship.save()
+        
+        serializer = FriendshipSerializer(friendship, context={"request": request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        """Reject a friend request."""
+        friendship = self.get_object()
+        
+        if friendship.recipient != request.user:
+            return Response(
+                {"error": "You can only reject requests sent to you"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if friendship.status != "pending":
+            return Response(
+                {"error": "This request is not pending"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        friendship.status = "rejected"
+        friendship.save()
+        
+        serializer = FriendshipSerializer(friendship, context={"request": request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def unfriend(self, request, pk=None):
+        """Remove a friend (delete the friendship)."""
+        friendship = self.get_object()
+        
+        if friendship.requester != request.user and friendship.recipient != request.user:
+            return Response(
+                {"error": "You can only unfriend yourself"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        friendship.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

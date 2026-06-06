@@ -369,3 +369,50 @@ class CreateCounselingCaseSerializer(serializers.Serializer):
         if data.get("case_type") == "other" and not data.get("case_type_other"):
             raise serializers.ValidationError("case_type_other is required when case_type is 'other'")
         return data
+
+
+class FriendshipSerializer(serializers.ModelSerializer):
+    requester_name = serializers.CharField(source="requester.display_name", read_only=True)
+    requester_email = serializers.EmailField(source="requester.email", read_only=True)
+    recipient_name = serializers.CharField(source="recipient.display_name", read_only=True)
+    recipient_email = serializers.EmailField(source="recipient.email", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = Friendship
+        fields = [
+            "id",
+            "requester",
+            "requester_name",
+            "requester_email",
+            "recipient",
+            "recipient_name",
+            "recipient_email",
+            "status",
+            "status_display",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class FriendshipCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Friendship
+        fields = ["recipient"]
+    
+    def validate_recipient(self, value):
+        """Validate that recipient is not the requester and no friendship already exists."""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            if value == request.user:
+                raise serializers.ValidationError("Cannot send friend request to yourself")
+            
+            # Check if friendship already exists
+            if Friendship.objects.filter(
+                requester=request.user, recipient=value
+            ).exists() or Friendship.objects.filter(
+                requester=value, recipient=request.user
+            ).exists():
+                raise serializers.ValidationError("Friendship already exists or pending")
+        return value
