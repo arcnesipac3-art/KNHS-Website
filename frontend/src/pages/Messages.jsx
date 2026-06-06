@@ -498,7 +498,7 @@ export default function Messages() {
 
   const socketStatusLabel = socketConnected
     ? 'Live sync is on'
-    : 'Live sync is unavailable. Sending still works.'
+    : 'Live sync unavailable. Messaging still works.'
 
   return (
     <PortalLayout>
