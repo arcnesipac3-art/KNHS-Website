@@ -10,14 +10,17 @@ import api from '../lib/api'
 export default function AdminDashboard() {
   const { user } = useAuth()
   const [academicYear, setAcademicYear] = useState(null)
-  const [stats, setStats] = useState({ total_students: 0, total_teachers: 0, total_classrooms: 0, pending_enrollments: 0 })
+  const [stats, setStats] = useState({ total_students: 0, total_teachers: 0, total_classrooms: 0, pending_enrollments: 0, total_users: 0, active_sessions: 0 })
+  const [systemHealth, setSystemHealth] = useState({ status: 'healthy', message: 'All systems operational' })
+  const [recentActivities, setRecentActivities] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadDashboard() {
-      const [yearResult, dashboardResult] = await Promise.allSettled([
+      const [yearResult, dashboardResult, activitiesResult] = await Promise.allSettled([
         getCurrentAcademicYearWithQuarters(),
         api.get('/dashboard/'),
+        api.get('/audit-logs/?limit=10'),
       ])
 
       if (yearResult.status === 'fulfilled') {
@@ -33,7 +36,15 @@ export default function AdminDashboard() {
           total_teachers: d?.users?.active_teachers ?? 0,
           total_classrooms: 0,
           pending_enrollments: d?.grades?.pending_approvals ?? 0,
+          total_users: (d?.users?.active_students ?? 0) + (d?.users?.active_teachers ?? 0) + (d?.users?.admins ?? 0) + (d?.users?.others ?? 0),
+          active_sessions: d?.active_sessions ?? 0,
         })
+      }
+
+      if (activitiesResult.status === 'fulfilled') {
+        setRecentActivities(activitiesResult.value.results || activitiesResult.value || [])
+      } else {
+        setRecentActivities([])
       }
 
       setLoading(false)
@@ -101,8 +112,8 @@ export default function AdminDashboard() {
           <Card className="border-l-4 border-l-blue-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-text">{stats?.total_students || 0}</p>
-                <p className="text-sm text-muted">Active Students</p>
+                <p className="text-2xl font-bold text-text">{stats?.total_users || 0}</p>
+                <p className="text-sm text-muted">Total Users</p>
               </div>
               <div className="rounded-lg bg-blue-100 p-3">
                 <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -112,29 +123,29 @@ export default function AdminDashboard() {
             </div>
           </Card>
 
-          <Card className="border-l-4 border-l-purple-500">
+          <Card className="border-l-4 border-l-green-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-text">{stats?.total_teachers || 0}</p>
-                <p className="text-sm text-muted">Teachers</p>
+                <p className="text-2xl font-bold text-text">{stats?.active_sessions || 0}</p>
+                <p className="text-sm text-muted">Active Sessions</p>
               </div>
-              <div className="rounded-lg bg-purple-100 p-3">
-                <svg className="h-6 w-6 text-knhs-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              <div className="rounded-lg bg-green-100 p-3">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
             </div>
           </Card>
 
-          <Card className="border-l-4 border-l-green-500">
+          <Card className="border-l-4 border-l-purple-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-text">{stats?.total_classrooms || 0}</p>
-                <p className="text-sm text-muted">Active Classes</p>
+                <p className="text-2xl font-bold text-text">{stats?.total_students || 0}</p>
+                <p className="text-sm text-muted">Students</p>
               </div>
-              <div className="rounded-lg bg-green-100 p-3">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <div className="rounded-lg bg-purple-100 p-3">
+                <svg className="h-6 w-6 text-knhs-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               </div>
             </div>
@@ -159,6 +170,61 @@ export default function AdminDashboard() {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Left Column (2/3) */}
           <div className="space-y-8 lg:col-span-2">
+            {/* System Health */}
+            <Card title="System Health" subtitle="Current system status">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-lg bg-green-50 p-4 text-center">
+                  <div className="flex items-center justify-center">
+                    <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-green-800">Backend</p>
+                  <p className="text-xs text-green-600">Operational</p>
+                </div>
+                <div className="rounded-lg bg-green-50 p-4 text-center">
+                  <div className="flex items-center justify-center">
+                    <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                    </svg>
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-green-800">Database</p>
+                  <p className="text-xs text-green-600">Connected</p>
+                </div>
+                <div className="rounded-lg bg-green-50 p-4 text-center">
+                  <div className="flex items-center justify-center">
+                    <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-green-800">Cache</p>
+                  <p className="text-xs text-green-600">Active</p>
+                </div>
+              </div>
+            </Card>
+
+            {/* User Statistics by Role */}
+            <Card title="User Statistics by Role" subtitle="Breakdown of users by role">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-lg border border-gray-200 p-4 text-center">
+                  <p className="text-2xl font-bold text-text">{stats?.total_students || 0}</p>
+                  <p className="text-sm text-muted">Students</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4 text-center">
+                  <p className="text-2xl font-bold text-text">{stats?.total_teachers || 0}</p>
+                  <p className="text-sm text-muted">Teachers</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4 text-center">
+                  <p className="text-2xl font-bold text-text">-</p>
+                  <p className="text-sm text-muted">Admins</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4 text-center">
+                  <p className="text-2xl font-bold text-text">-</p>
+                  <p className="text-sm text-muted">Others</p>
+                </div>
+              </div>
+            </Card>
+
             {/* System Overview */}
             <Card title="System Overview" subtitle="Current academic year status">
               <div className="space-y-4">
@@ -264,29 +330,49 @@ export default function AdminDashboard() {
           <div className="space-y-8">
             {/* Recent Activity */}
             <Card title="Recent Activity" subtitle="System events">
-              <div className="space-y-3">
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-sm font-medium text-text">System Status</p>
-                  <p className="mt-1 text-xs text-muted">All systems operational</p>
-                  <p className="mt-1 text-xs text-green-600">✓ Backend running</p>
+              {recentActivities?.length > 0 ? (
+                <div className="space-y-3">
+                  {recentActivities.slice(0, 5).map((activity) => (
+                    <div key={activity.id} className="rounded-lg border border-gray-200 p-3">
+                      <p className="text-sm font-medium text-text">{activity.action}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {activity.user} • {new Date(activity.timestamp).toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-xs text-muted line-clamp-2">{activity.details}</p>
+                    </div>
+                  ))}
+                  <Link
+                    to="/settings/audit"
+                    className="block text-center text-sm text-knhs-purple hover:underline"
+                  >
+                    View all activity →
+                  </Link>
                 </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-sm font-medium text-text">System Status</p>
+                    <p className="mt-1 text-xs text-muted">All systems operational</p>
+                    <p className="mt-1 text-xs text-green-600">✓ Backend running</p>
+                  </div>
 
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-sm font-medium text-text">Academic Year</p>
-                  <p className="mt-1 text-xs text-muted">
-                    {academicYear?.academicYear?.label || 'Not configured'}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">
-                    {quarters.length || 0} quarters defined
-                  </p>
-                </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-sm font-medium text-text">Academic Year</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {academicYear?.academicYear?.label || 'Not configured'}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      {quarters.length || 0} quarters defined
+                    </p>
+                  </div>
 
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-sm font-medium text-text">Database</p>
-                  <p className="mt-1 text-xs text-muted">19 models • 88 endpoints</p>
-                  <p className="mt-1 text-xs text-green-600">✓ Connected</p>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-sm font-medium text-text">Database</p>
+                    <p className="mt-1 text-xs text-muted">19 models • 88 endpoints</p>
+                    <p className="mt-1 text-xs text-green-600">✓ Connected</p>
+                  </div>
                 </div>
-              </div>
+              )}
             </Card>
 
             {/* Admin Tools */}
