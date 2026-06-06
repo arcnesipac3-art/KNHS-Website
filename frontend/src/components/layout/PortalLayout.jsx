@@ -163,7 +163,7 @@ export default function PortalLayout({ children }) {
     <div className="min-h-screen bg-background">
       <DepEdHeader compact />
       <div className="flex min-h-[calc(100vh-36px)]">
-        <aside className="fixed left-0 top-[36px] hidden h-[calc(100vh-36px)] w-64 shrink-0 flex-col border-r border-gray-200 bg-white md:flex md:overflow-hidden">
+        <aside className="fixed left-0 top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white md:flex md:overflow-hidden z-10 pt-[36px]">
           <div className="border-b border-gray-100 px-5 py-5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-knhs-purple text-sm font-bold text-white">
               KN
